@@ -60,8 +60,12 @@ serve(async (req) => {
     logStep("User authenticated", { userId: user.id });
 
     const url = new URL(req.url);
-    const limit = parseInt(url.searchParams.get('limit') || '10');
-    const offset = parseInt(url.searchParams.get('offset') || '0');
+    const limitParam = url.searchParams.get('limit') || '10';
+    const offsetParam = url.searchParams.get('offset') || '0';
+    
+    // Input validation for pagination parameters
+    const limit = Math.min(Math.max(parseInt(limitParam), 1), 100); // Max 100 items
+    const offset = Math.max(parseInt(offsetParam), 0);
 
     logStep("Fetching user scripts", { limit, offset });
 
@@ -102,7 +106,11 @@ serve(async (req) => {
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     logStep("ERROR in get-user-scripts", { message: errorMessage });
-    return new Response(JSON.stringify({ error: errorMessage }), {
+    
+    // Secure error handling
+    const publicError = "Failed to retrieve scripts. Please try again.";
+    
+    return new Response(JSON.stringify({ error: publicError }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

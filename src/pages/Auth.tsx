@@ -57,10 +57,26 @@ const Auth = () => {
       return;
     }
 
-    if (password.length < 6) {
+    // Enhanced password validation
+    if (password.length < 8) {
       toast({
         title: "Password Too Short",
-        description: "Password must be at least 6 characters long",
+        description: "Password must be at least 8 characters long",
+        variant: "destructive",
+      });
+      setIsLoading(false);
+      return;
+    }
+
+    const hasUppercase = /[A-Z]/.test(password);
+    const hasLowercase = /[a-z]/.test(password);
+    const hasNumbers = /\d/.test(password);
+    const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>]/.test(password);
+
+    if (!hasUppercase || !hasLowercase || !hasNumbers || !hasSpecialChar) {
+      toast({
+        title: "Weak Password",
+        description: "Password must contain uppercase, lowercase, numbers, and special characters",
         variant: "destructive",
       });
       setIsLoading(false);
@@ -260,7 +276,7 @@ const Auth = () => {
                   <Input
                     id="signup-password"
                     type="password"
-                    placeholder="Create a password (6+ characters)"
+                    placeholder="Create a strong password (8+ chars, mixed case, numbers, symbols)"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     disabled={isLoading}

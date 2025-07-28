@@ -62,13 +62,59 @@ serve(async (req) => {
     }
     logStep("User authenticated", { userId: user.id });
 
-    const { niche, length, tone, topic } = await req.json();
+    const body = await req.json();
+    const { niche, length, tone, topic } = body;
     
+    // Enhanced input validation and sanitization
     if (!niche || !length || !tone) {
       return new Response(
         JSON.stringify({ error: "Missing required fields: niche, length, tone" }),
         {
           status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    // Input length limits and validation
+    if (niche.length > 100 || length.length > 50 || tone.length > 50 || (topic && topic.length > 500)) {
+      return new Response(
+        JSON.stringify({ error: "Input fields exceed maximum length limits" }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    // Content filtering - check for inappropriate content
+    const inappropriateWords = ['explicit', 'adult', 'nsfw', 'sexual', 'violence', 'hate', 'illegal'];
+    const allInputs = [niche, tone, topic || ''].join(' ').toLowerCase();
+    if (inappropriateWords.some(word => allInputs.includes(word))) {
+      return new Response(
+        JSON.stringify({ error: "Request contains inappropriate content" }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    // Rate limiting check - prevent abuse
+    const { data: recentScripts, error: rateLimitError } = await supabaseClient
+      .from('scripts')
+      .select('created_at')
+      .eq('user_id', user.id)
+      .gte('created_at', new Date(Date.now() - 60 * 60 * 1000).toISOString()) // Last hour
+      .order('created_at', { ascending: false });
+
+    if (rateLimitError) {
+      logStep("Rate limit check failed", { error: rateLimitError });
+    } else if (recentScripts && recentScripts.length >= 10) {
+      return new Response(
+        JSON.stringify({ error: "Rate limit exceeded. Please wait before generating more scripts." }),
+        {
+          status: 429,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         }
       );
@@ -151,7 +197,16 @@ Please provide both a title and the full script content.`;
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     logStep("ERROR in generate-script", { message: errorMessage });
-    return new Response(JSON.stringify({ error: errorMessage }), {
+    
+    // Secure error handling - don't expose internal details
+    let publicError = "An unexpected error occurred. Please try again.";
+    if (errorMessage.includes("OpenAI API")) {
+      publicError = "AI service temporarily unavailable. Please try again later.";
+    } else if (errorMessage.includes("rate limit")) {
+      publicError = "Too many requests. Please wait before trying again.";
+    }
+    
+    return new Response(JSON.stringify({ error: publicError }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

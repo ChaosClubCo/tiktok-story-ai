@@ -59,11 +59,36 @@ serve(async (req) => {
     }
     logStep("User authenticated", { userId: user.id });
 
-    const { title, content, niche, length, tone, topic } = await req.json();
+    const body = await req.json();
+    
+    // Input size validation
+    if (JSON.stringify(body).length > 50000) {
+      return new Response(
+        JSON.stringify({ error: "Request too large" }),
+        {
+          status: 413,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    const { title, content, niche, length, tone, topic } = body;
     
     if (!title || !content || !niche || !length || !tone) {
       return new Response(
         JSON.stringify({ error: "Missing required fields: title, content, niche, length, tone" }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    // Input sanitization and length validation
+    if (title.length > 200 || content.length > 10000 || niche.length > 100 || 
+        length.length > 50 || tone.length > 50 || (topic && topic.length > 500)) {
+      return new Response(
+        JSON.stringify({ error: "Input fields exceed maximum length limits" }),
         {
           status: 400,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -103,7 +128,14 @@ serve(async (req) => {
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     logStep("ERROR in save-script", { message: errorMessage });
-    return new Response(JSON.stringify({ error: errorMessage }), {
+    
+    // Secure error handling
+    let publicError = "Failed to save script. Please try again.";
+    if (errorMessage.includes("Database error")) {
+      publicError = "Database temporarily unavailable. Please try again later.";
+    }
+    
+    return new Response(JSON.stringify({ error: publicError }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
