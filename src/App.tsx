@@ -6,6 +6,9 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
+import Dashboard from "./pages/Dashboard";
+import Analytics from "./pages/Analytics";
+import Templates from "./pages/Templates";
 import MyScripts from "./pages/MyScripts";
 import NotFound from "./pages/NotFound";
 
@@ -20,6 +23,9 @@ const App = () => (
         <BrowserRouter>
           <Routes>
             <Route path="/" element={<Index />} />
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/analytics" element={<Analytics />} />
+            <Route path="/templates" element={<Templates />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/my-scripts" element={<MyScripts />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
