@@ -1,8 +1,13 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 import { toast } from "@/hooks/use-toast";
+import { Header } from "@/components/Header";
 import { NicheSelector } from "@/components/NicheSelector";
 import { ScriptControls } from "@/components/ScriptControls";
 import { ScriptPreview } from "@/components/ScriptPreview";
+import { Button } from "@/components/ui/button";
 import heroImage from "@/assets/hero-drama.jpg";
 
 // Mock script generation - in real app, this would call an AI API
@@ -84,6 +89,8 @@ const generateMockScript = (niche: string, length: string, tone: string, topic: 
 };
 
 const Index = () => {
+  const { user, loading } = useAuth();
+  const navigate = useNavigate();
   const [selectedNiche, setSelectedNiche] = useState<string | null>(null);
   const [length, setLength] = useState("60s");
   const [tone, setTone] = useState("funny");
@@ -91,8 +98,14 @@ const Index = () => {
   const [script, setScript] = useState<any>(null);
   const [isGenerating, setIsGenerating] = useState(false);
 
+  useEffect(() => {
+    if (!loading && !user) {
+      navigate("/auth");
+    }
+  }, [user, loading, navigate]);
+
   const handleGenerate = async () => {
-    if (!selectedNiche) {
+    if (!selectedNiche || !user) {
       toast({
         title: "Select a Niche",
         description: "Please choose a drama niche first!",
@@ -103,28 +116,95 @@ const Index = () => {
 
     setIsGenerating(true);
     
-    // Simulate AI generation delay
-    setTimeout(() => {
+    try {
+      // Generate script using mock data (in real app, this would call an AI API)
       const generatedScript = generateMockScript(selectedNiche, length, tone, trendingTopic);
+      
+      // Save script to database
+      const { error } = await supabase
+        .from('scripts')
+        .insert([{
+          user_id: user.id,
+          title: generatedScript.title,
+          content: JSON.stringify(generatedScript),
+          niche: selectedNiche,
+          length,
+          tone,
+          topic: trendingTopic,
+        }]);
+
+      if (error) {
+        throw error;
+      }
+
       setScript(generatedScript);
       setIsGenerating(false);
       
       toast({
         title: "🎬 Script Generated!",
-        description: "Your viral TikTok script is ready!",
+        description: "Your viral TikTok script is ready and saved!",
       });
-    }, 2000);
+    } catch (error) {
+      console.error('Error saving script:', error);
+      setIsGenerating(false);
+      toast({
+        title: "Error",
+        description: "Failed to save script. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleExport = () => {
+    if (!script) return;
+    
+    const scriptText = `${script.title}\n\n${script.hook}\n\n${script.scenes.map((scene: any, index: number) => 
+      `Scene ${index + 1} (${scene.timeStamp}):\n${scene.dialogue}\nAction: ${scene.action}\nVisual: ${scene.visual}\nSound: ${scene.sound}`
+    ).join('\n\n')}\n\nHashtags: ${script.hashtags.map((tag: string) => `#${tag}`).join(' ')}`;
+    
+    const blob = new Blob([scriptText], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${script.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_script.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
     toast({
-      title: "Coming Soon!",
-      description: "Connect to Supabase to save and share your scripts!",
+      title: "Script Exported!",
+      description: "Your script has been downloaded as a text file.",
     });
   };
 
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <h2 className="text-2xl font-bold">Please sign in</h2>
+          <Button onClick={() => navigate("/auth")}>
+            Go to Login
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-hero">
+      <Header />
       {/* Hero Section */}
       <div className="relative h-[60vh] flex items-center justify-center overflow-hidden">
         <div className="absolute inset-0">
