@@ -9,6 +9,28 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// Input validation and sanitization functions
+const validateEmail = (email: string): boolean => {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email) && email.length <= 254;
+};
+
+const sanitizeInput = (input: string, maxLength: number = 100): string => {
+  return input
+    .replace(/[<>&"']/g, (char) => {
+      const entities: Record<string, string> = {
+        '<': '&lt;',
+        '>': '&gt;',
+        '&': '&amp;',
+        '"': '&quot;',
+        "'": '&#x27;'
+      };
+      return entities[char] || char;
+    })
+    .slice(0, maxLength)
+    .trim();
+};
+
 const logStep = (step: string, details?: any) => {
   const detailsStr = details ? ` - ${JSON.stringify(details)}` : '';
   console.log(`[REGISTRATION-EMAIL] ${step}${detailsStr}`);
@@ -23,18 +45,56 @@ serve(async (req) => {
     logStep("Function started");
 
     const { userEmail, displayName } = await req.json();
-    if (!userEmail) throw new Error("User email is required");
-    logStep("Processing registration email", { userEmail, displayName });
+    
+    // Input validation
+    if (!userEmail || !displayName) {
+      return new Response(
+        JSON.stringify({ error: "Missing required fields: userEmail and displayName" }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    if (!validateEmail(userEmail)) {
+      return new Response(
+        JSON.stringify({ error: "Invalid email format" }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    // Sanitize inputs
+    const sanitizedEmail = sanitizeInput(userEmail, 254);
+    const sanitizedDisplayName = sanitizeInput(displayName, 50);
+
+    logStep("Processing registration email", { userEmail: sanitizedEmail, displayName: sanitizedDisplayName });
+
+    // Get owner email from environment variable
+    const ownerEmail = Deno.env.get("OWNER_EMAIL");
+    if (!ownerEmail) {
+      console.error("OWNER_EMAIL environment variable not set");
+      return new Response(
+        JSON.stringify({ error: "Server configuration error" }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
 
     // Send notification email to owner
     const ownerEmailResponse = await resend.emails.send({
       from: "MiniDrama <onboarding@resend.dev>",
-      to: ["your-email@example.com"], // Replace with your actual email
+      to: [ownerEmail],
       subject: "New User Registration - MiniDrama",
       html: `
         <h2>New User Registration</h2>
-        <p><strong>Email:</strong> ${userEmail}</p>
-        <p><strong>Display Name:</strong> ${displayName || 'Not provided'}</p>
+        <p><strong>Email:</strong> ${sanitizedEmail}</p>
+        <p><strong>Display Name:</strong> ${sanitizedDisplayName}</p>
         <p><strong>Registration Time:</strong> ${new Date().toLocaleString()}</p>
         <hr>
         <p>This is an automated notification from your MiniDrama application.</p>
@@ -46,10 +106,10 @@ serve(async (req) => {
     // Send welcome email to new user
     const welcomeEmailResponse = await resend.emails.send({
       from: "MiniDrama <onboarding@resend.dev>",
-      to: [userEmail],
+      to: [sanitizedEmail],
       subject: "Welcome to MiniDrama!",
       html: `
-        <h1>Welcome to MiniDrama, ${displayName || 'Creator'}!</h1>
+        <h1>Welcome to MiniDrama, ${sanitizedDisplayName}!</h1>
         <p>Thank you for joining our community of creative storytellers.</p>
         
         <h2>Get Started:</h2>
