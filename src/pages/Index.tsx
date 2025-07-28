@@ -8,6 +8,7 @@ import { NicheSelector } from "@/components/NicheSelector";
 import { ScriptControls } from "@/components/ScriptControls";
 import { ScriptPreview } from "@/components/ScriptPreview";
 import { Button } from "@/components/ui/button";
+import { useSpecialEffects } from "@/hooks/useSpecialEffects";
 import heroImage from "@/assets/hero-drama.jpg";
 
 // Mock script generation - in real app, this would call an AI API
@@ -97,6 +98,7 @@ const Index = () => {
   const [trendingTopic, setTrendingTopic] = useState("");
   const [script, setScript] = useState<any>(null);
   const [isGenerating, setIsGenerating] = useState(false);
+  const { createConfetti, triggerRandomEffect } = useSpecialEffects();
 
   useEffect(() => {
     if (!loading && !user) {
@@ -139,6 +141,9 @@ const Index = () => {
 
       setScript(generatedScript);
       setIsGenerating(false);
+      
+      // Trigger confetti on successful generation
+      createConfetti();
       
       toast({
         title: "🎬 Script Generated!",
@@ -264,8 +269,15 @@ const Index = () => {
         {/* Footer */}
         <div className="text-center py-8 text-muted-foreground">
           <p className="text-sm">
-            Need backend features like saving scripts? Connect to{" "}
-            <span className="text-primary font-semibold">Supabase</span> via the green button above! 
+            Your scripts are automatically saved and accessible in{" "}
+            <Button 
+              variant="link" 
+              className="text-primary font-semibold p-0 h-auto"
+              onClick={() => navigate("/my-scripts")}
+            >
+              My Scripts
+            </Button>
+            {" "}section! ✨
           </p>
         </div>
       </div>
