@@ -147,7 +147,7 @@ const Auth = () => {
       return;
     }
 
-    const { error } = await supabase.auth.signInWithPassword({
+    const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
@@ -159,8 +159,15 @@ const Auth = () => {
         variant: "destructive",
       });
       setIsLoading(false);
-    } else {
-      navigate("/");
+    } else if (data.session) {
+      toast({
+        title: "Welcome back!",
+        description: "You have been signed in successfully",
+      });
+      // Wait a moment for the auth state to update
+      setTimeout(() => {
+        navigate("/");
+      }, 100);
     }
   };
 
