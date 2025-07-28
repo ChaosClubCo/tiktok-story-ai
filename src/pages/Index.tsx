@@ -7,6 +7,7 @@ import { Header } from "@/components/Header";
 import { NicheSelector } from "@/components/NicheSelector";
 import { ScriptControls } from "@/components/ScriptControls";
 import { ScriptPreview } from "@/components/ScriptPreview";
+import { SubscriptionTiers } from "@/components/SubscriptionTiers";
 import { Button } from "@/components/ui/button";
 import { useSpecialEffects } from "@/hooks/useSpecialEffects";
 import heroImage from "@/assets/hero-drama.jpg";
@@ -90,7 +91,7 @@ const generateMockScript = (niche: string, length: string, tone: string, topic: 
 };
 
 const Index = () => {
-  const { user, loading } = useAuth();
+  const { user, loading, subscription } = useAuth();
   const navigate = useNavigate();
   const [selectedNiche, setSelectedNiche] = useState<string | null>(null);
   const [length, setLength] = useState("60s");
@@ -265,6 +266,11 @@ const Index = () => {
             />
           </div>
         )}
+
+        {/* Subscription Tiers Section */}
+        <section className="py-12">
+          <SubscriptionTiers currentTier={subscription?.subscription_tier} />
+        </section>
 
         {/* Footer */}
         <div className="text-center py-8 text-muted-foreground">

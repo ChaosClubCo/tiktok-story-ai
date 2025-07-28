@@ -50,7 +50,7 @@ const Auth = () => {
       return;
     }
 
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
@@ -65,6 +65,20 @@ const Auth = () => {
         variant: "destructive",
       });
     } else {
+      // Send registration notification email
+      if (data.user) {
+        try {
+          await supabase.functions.invoke('send-registration-email', {
+            body: {
+              userEmail: email,
+              displayName: data.user.user_metadata?.display_name || 'New User'
+            }
+          });
+        } catch (emailError) {
+          console.error('Failed to send registration email:', emailError);
+        }
+      }
+
       toast({
         title: "Account Created!",
         description: "You can now sign in with your credentials",
