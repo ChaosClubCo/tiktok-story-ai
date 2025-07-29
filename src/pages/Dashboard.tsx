@@ -4,10 +4,13 @@ import { useAuth } from "@/hooks/useAuth";
 import { Header } from "@/components/Header";
 import ScriptWorkflow from "@/components/ScriptWorkflow";
 import ScriptGenerator from "@/components/ScriptGenerator";
+import { CreatorWellness } from "@/components/CreatorWellness";
+import { ViralTopicFinder } from "@/components/ViralTopicFinder";
+import { PerformanceTracker } from "@/components/PerformanceTracker";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { Zap, Workflow, TrendingUp, FileText } from "lucide-react";
+import { Zap, Workflow, TrendingUp, FileText, Heart, Target } from "lucide-react";
 
 const Dashboard = () => {
   const { user, loading } = useAuth();
@@ -95,14 +98,26 @@ const Dashboard = () => {
 
         {/* Main Dashboard Content */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-2">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="workflow" className="flex items-center gap-2">
               <Workflow className="w-4 h-4" />
-              15-Step Workflow
+              Workflow
             </TabsTrigger>
             <TabsTrigger value="generator" className="flex items-center gap-2">
               <Zap className="w-4 h-4" />
-              AI Generator
+              Generator
+            </TabsTrigger>
+            <TabsTrigger value="topics" className="flex items-center gap-2">
+              <TrendingUp className="w-4 h-4" />
+              Viral Topics
+            </TabsTrigger>
+            <TabsTrigger value="wellness" className="flex items-center gap-2">
+              <Heart className="w-4 h-4" />
+              Wellness
+            </TabsTrigger>
+            <TabsTrigger value="performance" className="flex items-center gap-2">
+              <Target className="w-4 h-4" />
+              Analytics
             </TabsTrigger>
           </TabsList>
           
@@ -138,6 +153,18 @@ const Dashboard = () => {
                 <ScriptGenerator />
               </CardContent>
             </Card>
+          </TabsContent>
+          
+          <TabsContent value="topics" className="space-y-6">
+            <ViralTopicFinder />
+          </TabsContent>
+          
+          <TabsContent value="wellness" className="space-y-6">
+            <CreatorWellness />
+          </TabsContent>
+          
+          <TabsContent value="performance" className="space-y-6">
+            <PerformanceTracker />
           </TabsContent>
         </Tabs>
       </div>
