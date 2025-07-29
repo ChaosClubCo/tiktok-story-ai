@@ -94,11 +94,14 @@ const Auth = () => {
       return;
     }
 
+    // Use hardcoded trusted redirect URL instead of dynamic origin
+    const trustedRedirectUrl = "https://zealous-glacier-01b3a5e10.4.azurestaticapps.net/";
+    
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
-        emailRedirectTo: `${window.location.origin}/`,
+        emailRedirectTo: trustedRedirectUrl,
       },
     });
 
@@ -185,8 +188,11 @@ const Auth = () => {
       return;
     }
 
+    // Use hardcoded trusted redirect URL instead of dynamic origin
+    const trustedRedirectUrl = "https://zealous-glacier-01b3a5e10.4.azurestaticapps.net/";
+    
     const { error } = await supabase.auth.resetPasswordForEmail(resetEmail, {
-      redirectTo: `${window.location.origin}/`,
+      redirectTo: trustedRedirectUrl,
     });
 
     if (error) {

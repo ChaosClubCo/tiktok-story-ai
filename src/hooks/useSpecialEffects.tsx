@@ -36,7 +36,7 @@ export const useSpecialEffects = () => {
 
   const createSparkle = useCallback((x: number, y: number) => {
     const sparkle = document.createElement('div');
-    sparkle.innerHTML = '✨';
+    sparkle.textContent = '✨'; // Use textContent instead of innerHTML to prevent XSS
     sparkle.style.cssText = `
       position: fixed;
       left: ${x}px;
