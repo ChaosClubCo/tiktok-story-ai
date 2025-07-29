@@ -7,10 +7,14 @@ import ScriptGenerator from "@/components/ScriptGenerator";
 import { CreatorWellness } from "@/components/CreatorWellness";
 import { ViralTopicFinder } from "@/components/ViralTopicFinder";
 import { PerformanceTracker } from "@/components/PerformanceTracker";
+import { FastValueDelivery } from "@/components/FastValueDelivery";
+import { SocialProofCapture } from "@/components/SocialProofCapture";
+import { VisualCreativeHooks } from "@/components/VisualCreativeHooks";
+import { ChatFeedbackRewards } from "@/components/ChatFeedbackRewards";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { Zap, Workflow, TrendingUp, FileText, Heart, Target } from "lucide-react";
+import { Zap, Workflow, TrendingUp, FileText, Heart, Target, Rocket, Users, Palette, MessageCircle } from "lucide-react";
 
 const Dashboard = () => {
   const { user, loading } = useAuth();
@@ -98,26 +102,42 @@ const Dashboard = () => {
 
         {/* Main Dashboard Content */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5">
-            <TabsTrigger value="workflow" className="flex items-center gap-2">
-              <Workflow className="w-4 h-4" />
-              Workflow
+          <TabsList className="grid w-full grid-cols-4 lg:grid-cols-9 gap-1">
+            <TabsTrigger value="workflow" className="flex items-center gap-1 text-xs">
+              <Workflow className="w-3 h-3" />
+              <span className="hidden sm:inline">Workflow</span>
             </TabsTrigger>
-            <TabsTrigger value="generator" className="flex items-center gap-2">
-              <Zap className="w-4 h-4" />
-              Generator
+            <TabsTrigger value="generator" className="flex items-center gap-1 text-xs">
+              <Zap className="w-3 h-3" />
+              <span className="hidden sm:inline">Generator</span>
             </TabsTrigger>
-            <TabsTrigger value="topics" className="flex items-center gap-2">
-              <TrendingUp className="w-4 h-4" />
-              Viral Topics
+            <TabsTrigger value="topics" className="flex items-center gap-1 text-xs">
+              <TrendingUp className="w-3 h-3" />
+              <span className="hidden sm:inline">Topics</span>
             </TabsTrigger>
-            <TabsTrigger value="wellness" className="flex items-center gap-2">
-              <Heart className="w-4 h-4" />
-              Wellness
+            <TabsTrigger value="wellness" className="flex items-center gap-1 text-xs">
+              <Heart className="w-3 h-3" />
+              <span className="hidden sm:inline">Wellness</span>
             </TabsTrigger>
-            <TabsTrigger value="performance" className="flex items-center gap-2">
-              <Target className="w-4 h-4" />
-              Analytics
+            <TabsTrigger value="performance" className="flex items-center gap-1 text-xs">
+              <Target className="w-3 h-3" />
+              <span className="hidden sm:inline">Analytics</span>
+            </TabsTrigger>
+            <TabsTrigger value="fast-delivery" className="flex items-center gap-1 text-xs">
+              <Rocket className="w-3 h-3" />
+              <span className="hidden sm:inline">Fast</span>
+            </TabsTrigger>
+            <TabsTrigger value="social-proof" className="flex items-center gap-1 text-xs">
+              <Users className="w-3 h-3" />
+              <span className="hidden sm:inline">Social</span>
+            </TabsTrigger>
+            <TabsTrigger value="visual-hooks" className="flex items-center gap-1 text-xs">
+              <Palette className="w-3 h-3" />
+              <span className="hidden sm:inline">Visual</span>
+            </TabsTrigger>
+            <TabsTrigger value="chat-rewards" className="flex items-center gap-1 text-xs">
+              <MessageCircle className="w-3 h-3" />
+              <span className="hidden sm:inline">Chat</span>
             </TabsTrigger>
           </TabsList>
           
@@ -165,6 +185,22 @@ const Dashboard = () => {
           
           <TabsContent value="performance" className="space-y-6">
             <PerformanceTracker />
+          </TabsContent>
+          
+          <TabsContent value="fast-delivery" className="space-y-6">
+            <FastValueDelivery />
+          </TabsContent>
+          
+          <TabsContent value="social-proof" className="space-y-6">
+            <SocialProofCapture />
+          </TabsContent>
+          
+          <TabsContent value="visual-hooks" className="space-y-6">
+            <VisualCreativeHooks />
+          </TabsContent>
+          
+          <TabsContent value="chat-rewards" className="space-y-6">
+            <ChatFeedbackRewards />
           </TabsContent>
         </Tabs>
       </div>
