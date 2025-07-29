@@ -11,10 +11,16 @@ import { FastValueDelivery } from "@/components/FastValueDelivery";
 import { SocialProofCapture } from "@/components/SocialProofCapture";
 import { VisualCreativeHooks } from "@/components/VisualCreativeHooks";
 import { ChatFeedbackRewards } from "@/components/ChatFeedbackRewards";
+import { AIVideoGeneration } from "@/components/AIVideoGeneration";
+import { AIScriptOptimization } from "@/components/AIScriptOptimization";
+import { VoiceToneConsistency } from "@/components/VoiceToneConsistency";
+import { ContentCalendarIntegration } from "@/components/ContentCalendarIntegration";
+import { MultiPlatformAdaptation } from "@/components/MultiPlatformAdaptation";
+import { CreatorMarketplace } from "@/components/CreatorMarketplace";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { Zap, Workflow, TrendingUp, FileText, Heart, Target, Rocket, Users, Palette, MessageCircle } from "lucide-react";
+import { Zap, Workflow, TrendingUp, FileText, Heart, Target, Rocket, Users, Palette, MessageCircle, Video, Sparkles, Mic, Calendar, Share2, Store } from "lucide-react";
 
 const Dashboard = () => {
   const { user, loading } = useAuth();
@@ -102,7 +108,7 @@ const Dashboard = () => {
 
         {/* Main Dashboard Content */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4 lg:grid-cols-9 gap-1">
+          <TabsList className="grid w-full grid-cols-5 lg:grid-cols-15 gap-1">
             <TabsTrigger value="workflow" className="flex items-center gap-1 text-xs">
               <Workflow className="w-3 h-3" />
               <span className="hidden sm:inline">Workflow</span>
@@ -138,6 +144,30 @@ const Dashboard = () => {
             <TabsTrigger value="chat-rewards" className="flex items-center gap-1 text-xs">
               <MessageCircle className="w-3 h-3" />
               <span className="hidden sm:inline">Chat</span>
+            </TabsTrigger>
+            <TabsTrigger value="ai-video" className="flex items-center gap-1 text-xs">
+              <Video className="w-3 h-3" />
+              <span className="hidden sm:inline">AI Video</span>
+            </TabsTrigger>
+            <TabsTrigger value="optimization" className="flex items-center gap-1 text-xs">
+              <Sparkles className="w-3 h-3" />
+              <span className="hidden sm:inline">Optimize</span>
+            </TabsTrigger>
+            <TabsTrigger value="voice-tone" className="flex items-center gap-1 text-xs">
+              <Mic className="w-3 h-3" />
+              <span className="hidden sm:inline">Voice</span>
+            </TabsTrigger>
+            <TabsTrigger value="calendar" className="flex items-center gap-1 text-xs">
+              <Calendar className="w-3 h-3" />
+              <span className="hidden sm:inline">Calendar</span>
+            </TabsTrigger>
+            <TabsTrigger value="platform" className="flex items-center gap-1 text-xs">
+              <Share2 className="w-3 h-3" />
+              <span className="hidden sm:inline">Platform</span>
+            </TabsTrigger>
+            <TabsTrigger value="marketplace" className="flex items-center gap-1 text-xs">
+              <Store className="w-3 h-3" />
+              <span className="hidden sm:inline">Market</span>
             </TabsTrigger>
           </TabsList>
           
@@ -201,6 +231,30 @@ const Dashboard = () => {
           
           <TabsContent value="chat-rewards" className="space-y-6">
             <ChatFeedbackRewards />
+          </TabsContent>
+          
+          <TabsContent value="ai-video" className="space-y-6">
+            <AIVideoGeneration />
+          </TabsContent>
+          
+          <TabsContent value="optimization" className="space-y-6">
+            <AIScriptOptimization />
+          </TabsContent>
+          
+          <TabsContent value="voice-tone" className="space-y-6">
+            <VoiceToneConsistency />
+          </TabsContent>
+          
+          <TabsContent value="calendar" className="space-y-6">
+            <ContentCalendarIntegration />
+          </TabsContent>
+          
+          <TabsContent value="platform" className="space-y-6">
+            <MultiPlatformAdaptation />
+          </TabsContent>
+          
+          <TabsContent value="marketplace" className="space-y-6">
+            <CreatorMarketplace />
           </TabsContent>
         </Tabs>
       </div>
