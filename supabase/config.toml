@@ -18,3 +18,9 @@ verify_jwt = true
 
 [functions.send-registration-email]
 verify_jwt = false
+
+[functions.security-headers]
+verify_jwt = false
+
+[functions.security-monitor]
+verify_jwt = false

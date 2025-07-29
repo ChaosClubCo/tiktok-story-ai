@@ -9,6 +9,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, HelpCircle, Mail, Phone, MapPin, RefreshCw } from "lucide-react";
+import { useSecurityMonitoring } from "@/hooks/useSecurityMonitoring";
+import { useRateLimit } from "@/hooks/useRateLimit";
+import { SecurityIndicator } from "@/components/SecurityIndicator";
 
 const Auth = () => {
   const [email, setEmail] = useState("");
@@ -20,6 +23,9 @@ const Auth = () => {
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { monitorAuthAttempts, monitorSuspiciousActivity } = useSecurityMonitoring();
+  const authRateLimit = useRateLimit({ maxAttempts: 5, windowMs: 15 * 60 * 1000, identifier: 'auth' });
+  const passwordResetRateLimit = useRateLimit({ maxAttempts: 3, windowMs: 5 * 60 * 1000, identifier: 'password-reset' });
 
   // Generate simple math captcha
   const generateCaptcha = () => {
@@ -45,6 +51,18 @@ const Auth = () => {
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Check rate limiting
+    const rateLimitCheck = authRateLimit.checkRateLimit();
+    if (!rateLimitCheck.allowed) {
+      toast({
+        variant: "destructive",
+        title: "Too Many Attempts",
+        description: `Please wait ${rateLimitCheck.retryAfter} seconds before trying again.`,
+      });
+      return;
+    }
+    
     setIsLoading(true);
 
     if (!email || !password) {
@@ -106,6 +124,7 @@ const Auth = () => {
     });
 
     if (error) {
+      monitorAuthAttempts(email, false);
       toast({
         title: "Sign Up Failed",
         description: error.message,
@@ -126,6 +145,8 @@ const Auth = () => {
         }
       }
 
+      monitorAuthAttempts(email, true);
+      
       toast({
         title: "Account Created!",
         description: "You can now sign in with your credentials",
@@ -138,6 +159,18 @@ const Auth = () => {
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Check rate limiting
+    const rateLimitCheck = authRateLimit.checkRateLimit();
+    if (!rateLimitCheck.allowed) {
+      toast({
+        variant: "destructive",
+        title: "Too Many Attempts",
+        description: `Please wait ${rateLimitCheck.retryAfter} seconds before trying again.`,
+      });
+      return;
+    }
+    
     setIsLoading(true);
 
     if (!email || !password) {
@@ -156,6 +189,7 @@ const Auth = () => {
     });
 
     if (error) {
+      monitorAuthAttempts(email, false);
       toast({
         title: "Sign In Failed",
         description: error.message,
@@ -163,6 +197,7 @@ const Auth = () => {
       });
       setIsLoading(false);
     } else if (data.session) {
+      monitorAuthAttempts(email, true);
       toast({
         title: "Welcome back!",
         description: "You have been signed in successfully",
@@ -176,6 +211,18 @@ const Auth = () => {
 
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Check rate limiting for password reset
+    const rateLimitCheck = passwordResetRateLimit.checkRateLimit();
+    if (!rateLimitCheck.allowed) {
+      toast({
+        variant: "destructive",
+        title: "Too Many Reset Attempts",
+        description: `Please wait ${rateLimitCheck.retryAfter} seconds before requesting another reset.`,
+      });
+      return;
+    }
+    
     setIsResetLoading(true);
 
     if (!resetEmail) {
@@ -222,6 +269,15 @@ const Auth = () => {
           <CardDescription>
             Create viral TikTok scripts with AI
           </CardDescription>
+          <div className="flex justify-center pt-2">
+            <SecurityIndicator 
+              isLimited={authRateLimit.isLimited}
+              attempts={authRateLimit.attempts}
+              maxAttempts={authRateLimit.maxAttempts}
+              remainingTime={authRateLimit.remainingTime}
+              progressPercentage={authRateLimit.progressPercentage}
+            />
+          </div>
         </CardHeader>
         <CardContent>
           <Tabs defaultValue="signin" className="space-y-4">
