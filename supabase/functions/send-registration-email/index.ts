@@ -31,7 +31,7 @@ const sanitizeInput = (input: string, maxLength: number = 100): string => {
     .trim();
 };
 
-const logStep = (step: string, details?: any) => {
+const logStep = (step: string, details?: unknown) => {
   const detailsStr = details ? ` - ${JSON.stringify(details)}` : '';
   console.log(`[REGISTRATION-EMAIL] ${step}${detailsStr}`);
 };

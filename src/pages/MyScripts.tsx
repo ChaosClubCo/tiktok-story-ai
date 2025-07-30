@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
@@ -7,6 +7,23 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { Trash2, Download, Eye } from "lucide-react";
 import { Header } from "@/components/Header";
+
+interface Scene {
+  id: number;
+  timeStamp: string;
+  dialogue: string;
+  action: string;
+  visual: string;
+  sound: string;
+}
+
+interface Script {
+  title: string;
+  hook: string;
+  scenes: Scene[];
+  hashtags: string[];
+  cta: string;
+}
 
 interface SavedScript {
   id: string;
@@ -23,21 +40,23 @@ const MyScripts = () => {
   const { user } = useAuth();
   const [scripts, setScripts] = useState<SavedScript[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedScript, setSelectedScript] = useState<any>(null);
+  const [selectedScript, setSelectedScript] = useState<Script | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
     if (user) {
       fetchScripts();
     }
-  }, [user]);
+  }, [user, fetchScripts]);
 
-  const fetchScripts = async () => {
+  const fetchScripts = useCallback(async () => {
+    if (!user?.id) return;
+    
     try {
       const { data, error } = await supabase
         .from('scripts')
         .select('*')
-        .eq('user_id', user?.id)
+        .eq('user_id', user.id)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -52,7 +71,7 @@ const MyScripts = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user?.id, toast]);
 
   const handleDelete = async (scriptId: string) => {
     try {
@@ -95,7 +114,7 @@ const MyScripts = () => {
   const handleExport = (script: SavedScript) => {
     try {
       const parsedContent = JSON.parse(script.content);
-      const scriptText = `${parsedContent.title}\n\n${parsedContent.hook}\n\n${parsedContent.scenes.map((scene: any, index: number) => 
+      const scriptText = `${parsedContent.title}\n\n${parsedContent.hook}\n\n${parsedContent.scenes.map((scene, index: number) => 
         `Scene ${index + 1} (${scene.timeStamp}):\n${scene.dialogue}\nAction: ${scene.action}\nVisual: ${scene.visual}\nSound: ${scene.sound}`
       ).join('\n\n')}\n\nHashtags: ${parsedContent.hashtags.map((tag: string) => `#${tag}`).join(' ')}`;
       
@@ -236,7 +255,7 @@ const MyScripts = () => {
                   {/* Scenes */}
                   <div className="space-y-4">
                     <h3 className="text-xl font-semibold">Scene Breakdown:</h3>
-                    {selectedScript.scenes.map((scene: any) => (
+                    {selectedScript.scenes.map((scene) => (
                       <div key={scene.id} className="border border-border/50 rounded-lg p-4 bg-background/30">
                         <div className="flex items-center gap-2 mb-3">
                           <Badge variant="outline" className="bg-primary/20 text-primary border-primary/30">
