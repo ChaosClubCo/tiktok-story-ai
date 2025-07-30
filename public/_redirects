@@ -1,0 +1,5 @@
+# Handle client-side routing for SPA
+/*    /index.html   200
+
+# API routes should go to Supabase functions
+/api/*  https://aughkdwuvkgigczkfozp.supabase.co/functions/v1/:splat  200
