@@ -3,14 +3,23 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Zap, Clock, TrendingUp, Target, Sparkles, Timer, Rocket } from "lucide-react";
+import { Zap, Clock, TrendingUp, Target, Sparkles, Timer, Rocket, LucideIcon } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+
+interface QuickTemplate {
+  id: string;
+  title: string;
+  description: string;
+  time: string;
+  icon: LucideIcon;
+  result: string;
+}
 
 export const FastValueDelivery = () => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [progress, setProgress] = useState(0);
 
-  const quickTemplates = [
+  const quickTemplates: QuickTemplate[] = [
     {
       id: "instant-hook",
       title: "Instant Viral Hook",
@@ -37,7 +46,7 @@ export const FastValueDelivery = () => {
     }
   ];
 
-  const handleQuickGenerate = async (template: any) => {
+  const handleQuickGenerate = async (template: QuickTemplate) => {
     setIsGenerating(true);
     setProgress(0);
     

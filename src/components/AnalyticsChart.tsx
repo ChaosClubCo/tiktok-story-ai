@@ -39,7 +39,16 @@ const AnalyticsChart = ({ data }: AnalyticsChartProps) => {
     }));
 
   // Process data for niche comparison
-  const nicheData = data.reduce((acc: any[], item) => {
+  interface NicheData {
+    niche: string;
+    views: number;
+    likes: number;
+    shares: number;
+    comments: number;
+    count: number;
+  }
+  
+  const nicheData = data.reduce((acc: NicheData[], item) => {
     const existingNiche = acc.find(n => n.niche === item.niche);
     if (existingNiche) {
       existingNiche.views += item.views;
@@ -77,12 +86,22 @@ const AnalyticsChart = ({ data }: AnalyticsChartProps) => {
       engagement: parseFloat(item.engagement_rate)
     }));
 
-  const CustomTooltip = ({ active, payload, label }: any) => {
+  interface TooltipProps {
+    active?: boolean;
+    payload?: Array<{
+      name: string;
+      value: number | string;
+      color: string;
+    }>;
+    label?: string;
+  }
+
+  const CustomTooltip = ({ active, payload, label }: TooltipProps) => {
     if (active && payload && payload.length) {
       return (
         <div className="bg-background border rounded-lg p-3 shadow-lg">
           <p className="font-medium">{label}</p>
-          {payload.map((entry: any, index: number) => (
+          {payload.map((entry, index: number) => (
             <p key={index} style={{ color: entry.color }}>
               {entry.name}: {typeof entry.value === 'number' ? entry.value.toLocaleString() : entry.value}
               {entry.name.includes('engagement') ? '%' : ''}
