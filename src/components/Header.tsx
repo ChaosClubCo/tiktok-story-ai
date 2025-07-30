@@ -27,7 +27,7 @@ export const Header = () => {
         <div className="flex items-center space-x-4">
           <h2 
             className="text-lg font-semibold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent cursor-pointer hover:opacity-80 transition-opacity"
-            onClick={() => navigate("/")}
+            onClick={() => navigate("/dashboard")}
           >
             MiniDrama
           </h2>

@@ -42,7 +42,7 @@ const Auth = () => {
     const checkSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
-        navigate("/");
+        navigate("/dashboard");
       }
     };
     checkSession();
@@ -112,8 +112,8 @@ const Auth = () => {
       return;
     }
 
-    // Use hardcoded trusted redirect URL instead of dynamic origin
-    const trustedRedirectUrl = "https://zealous-glacier-01b3a5e10.4.azurestaticapps.net/";
+    // Use dynamic redirect URL based on current origin
+    const trustedRedirectUrl = `${window.location.origin}/dashboard`;
     
     const { data, error } = await supabase.auth.signUp({
       email,
@@ -202,9 +202,9 @@ const Auth = () => {
         title: "Welcome back!",
         description: "You have been signed in successfully",
       });
-      // Wait a moment for the auth state to update
+      // Wait a moment for the auth state to update, then go to dashboard
       setTimeout(() => {
-        navigate("/");
+        navigate("/dashboard");
       }, 100);
     }
   };
@@ -235,8 +235,8 @@ const Auth = () => {
       return;
     }
 
-    // Use hardcoded trusted redirect URL instead of dynamic origin
-    const trustedRedirectUrl = "https://zealous-glacier-01b3a5e10.4.azurestaticapps.net/";
+    // Use dynamic redirect URL based on current origin
+    const trustedRedirectUrl = `${window.location.origin}/auth`;
     
     const { error } = await supabase.auth.resetPasswordForEmail(resetEmail, {
       redirectTo: trustedRedirectUrl,
