@@ -8,6 +8,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Image, Video, Palette, Sparkles, Wand2, Download, Eye, Zap } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
+interface Effect {
+  icon: string;
+  name: string;
+  description: string;
+}
+
 export const VisualCreativeHooks = () => {
   const [prompt, setPrompt] = useState("");
   const [style, setStyle] = useState("");
@@ -63,7 +69,7 @@ export const VisualCreativeHooks = () => {
     });
   };
 
-  const handleEffectApply = (effect: any) => {
+  const handleEffectApply = (effect: Effect) => {
     toast({
       title: `${effect.icon} ${effect.name} Applied!`,
       description: effect.description,
