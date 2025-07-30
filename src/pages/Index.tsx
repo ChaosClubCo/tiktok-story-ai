@@ -12,6 +12,22 @@ import { Button } from "@/components/ui/button";
 import { useSpecialEffects } from "@/hooks/useSpecialEffects";
 import heroImage from "@/assets/hero-drama.jpg";
 
+interface ScriptScene {
+  id: number;
+  timeStamp: string;
+  dialogue: string;
+  action: string;
+  visual: string;
+  sound: string;
+}
+
+interface Script {
+  title: string;
+  hook: string;
+  scenes: ScriptScene[];
+  hashtags: string[];
+}
+
 // Mock script generation - in real app, this would call an AI API
 const generateMockScript = (niche: string, length: string, tone: string, topic: string) => {
   const scripts = {
@@ -97,7 +113,7 @@ const Index = () => {
   const [length, setLength] = useState("60s");
   const [tone, setTone] = useState("funny");
   const [trendingTopic, setTrendingTopic] = useState("");
-  const [script, setScript] = useState<any>(null);
+  const [script, setScript] = useState<Script | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const { createConfetti, triggerRandomEffect } = useSpecialEffects();
 
@@ -164,7 +180,7 @@ const Index = () => {
   const handleExport = () => {
     if (!script) return;
     
-    const scriptText = `${script.title}\n\n${script.hook}\n\n${script.scenes.map((scene: any, index: number) => 
+    const scriptText = `${script.title}\n\n${script.hook}\n\n${script.scenes.map((scene: ScriptScene, index: number) => 
       `Scene ${index + 1} (${scene.timeStamp}):\n${scene.dialogue}\nAction: ${scene.action}\nVisual: ${scene.visual}\nSound: ${scene.sound}`
     ).join('\n\n')}\n\nHashtags: ${script.hashtags.map((tag: string) => `#${tag}`).join(' ')}`;
     

@@ -108,7 +108,7 @@ export const useSpecialEffects = () => {
       case 'glow':
       case 'shake':
       case 'bounce':
-      case 'pulse':
+      case 'pulse': {
         // Apply to random interactive elements
         const interactiveElements = document.querySelectorAll('button, [role="button"], .card');
         if (interactiveElements.length > 0) {
@@ -119,6 +119,7 @@ export const useSpecialEffects = () => {
           else if (randomEffect === 'pulse') addPulseEffect(randomElement);
         }
         break;
+      }
     }
   }, [createConfetti, createSparkle, addGlowEffect, addShakeEffect, addBounceEffect, addPulseEffect]);
 

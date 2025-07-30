@@ -6,6 +6,15 @@ import { Progress } from "@/components/ui/progress";
 import { Zap, Clock, TrendingUp, Target, Sparkles, Timer, Rocket } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
+interface QuickTemplate {
+  id: string;
+  title: string;
+  description: string;
+  time: string;
+  icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
+  result: string;
+}
+
 export const FastValueDelivery = () => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -37,7 +46,7 @@ export const FastValueDelivery = () => {
     }
   ];
 
-  const handleQuickGenerate = async (template: any) => {
+  const handleQuickGenerate = async (template: QuickTemplate) => {
     setIsGenerating(true);
     setProgress(0);
     
