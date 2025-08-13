@@ -27,11 +27,11 @@ const Dashboard = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("workflow");
 
-  useEffect(() => {
-    if (!loading && !user) {
-      navigate("/auth");
-    }
-  }, [user, loading, navigate]);
+  // useEffect(() => {
+  //   if (!loading && !user) {
+  //     navigate("/auth");
+  //   }
+  // }, [user, loading, navigate]);
 
   if (loading) {
     return (
@@ -44,18 +44,18 @@ const Dashboard = () => {
     );
   }
 
-  if (!user) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center space-y-4">
-          <h2 className="text-2xl font-bold">Please sign in</h2>
-          <Button onClick={() => navigate("/auth")}>
-            Go to Login
-          </Button>
-        </div>
-      </div>
-    );
-  }
+  // if (!user) {
+  //   return (
+  //     <div className="min-h-screen flex items-center justify-center">
+  //       <div className="text-center space-y-4">
+  //         <h2 className="text-2xl font-bold">Please sign in</h2>
+  //         <Button onClick={() => navigate("/auth")}>
+  //           Go to Login
+  //         </Button>
+  //       </div>
+  //     </div>
+  //   );
+  // }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background to-secondary/20">
