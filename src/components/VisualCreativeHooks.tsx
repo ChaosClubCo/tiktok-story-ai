@@ -8,6 +8,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Image, Video, Palette, Sparkles, Wand2, Download, Eye, Zap } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
+interface VideoEffect {
+  name: string;
+  description: string;
+  icon: string;
+}
+
 export const VisualCreativeHooks = () => {
   const [prompt, setPrompt] = useState("");
   const [style, setStyle] = useState("");
@@ -30,7 +36,7 @@ export const VisualCreativeHooks = () => {
     "Multiple people reacting to same situation with different emotions"
   ];
 
-  const videoEffects = [
+  const videoEffects: VideoEffect[] = [
     { name: "Zoom Transition", description: "Quick zoom for emphasis", icon: "🎯" },
     { name: "Speed Ramp", description: "Slow to fast motion", icon: "⚡" },
     { name: "Split Screen", description: "Show multiple angles", icon: "📱" },
@@ -63,7 +69,7 @@ export const VisualCreativeHooks = () => {
     });
   };
 
-  const handleEffectApply = (effect: any) => {
+  const handleEffectApply = (effect: VideoEffect) => {
     toast({
       title: `${effect.icon} ${effect.name} Applied!`,
       description: effect.description,
