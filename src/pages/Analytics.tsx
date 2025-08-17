@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -37,9 +37,9 @@ const Analytics = () => {
     } else if (user) {
       fetchScripts();
     }
-  }, [user, loading, navigate]);
+  }, [user, loading, navigate, fetchScripts]);
 
-  const fetchScripts = async () => {
+  const fetchScripts = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from('scripts')
@@ -54,7 +54,7 @@ const Analytics = () => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [user]);
 
   // Mock analytics data - in real app, this would come from actual performance data
   const mockPerformanceData = scripts.map((script, index) => ({
