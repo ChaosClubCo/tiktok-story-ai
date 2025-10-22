@@ -22,14 +22,22 @@ export default {
 				border: 'hsl(var(--border))',
 				input: 'hsl(var(--input))',
 				ring: 'hsl(var(--ring))',
-				background: 'hsl(var(--background))',
+				background: {
+					DEFAULT: 'hsl(var(--background))',
+					base: 'hsl(var(--background-base))',
+					elevated: 'hsl(var(--background-elevated))',
+					floating: 'hsl(var(--background-floating))',
+					highest: 'hsl(var(--background-highest))',
+				},
 				foreground: 'hsl(var(--foreground))',
 				primary: {
 					DEFAULT: 'hsl(var(--primary))',
+					glow: 'hsl(var(--primary-glow))',
 					foreground: 'hsl(var(--primary-foreground))'
 				},
 				secondary: {
 					DEFAULT: 'hsl(var(--secondary))',
+					dim: 'hsl(var(--secondary-dim))',
 					foreground: 'hsl(var(--secondary-foreground))'
 				},
 				destructive: {
@@ -50,7 +58,24 @@ export default {
 				},
 				card: {
 					DEFAULT: 'hsl(var(--card))',
+					elevated: 'hsl(var(--card-elevated))',
 					foreground: 'hsl(var(--card-foreground))'
+				},
+				success: {
+					DEFAULT: 'hsl(var(--success))',
+					foreground: 'hsl(var(--success-foreground))'
+				},
+				warning: {
+					DEFAULT: 'hsl(var(--warning))',
+					foreground: 'hsl(var(--warning-foreground))'
+				},
+				error: {
+					DEFAULT: 'hsl(var(--error))',
+					foreground: 'hsl(var(--error-foreground))'
+				},
+				info: {
+					DEFAULT: 'hsl(var(--info))',
+					foreground: 'hsl(var(--info-foreground))'
 				},
 				sidebar: {
 					DEFAULT: 'hsl(var(--sidebar-background))',
@@ -72,14 +97,22 @@ export default {
 				'gradient-drama': 'var(--gradient-drama)',
 				'gradient-hero': 'var(--gradient-hero)',
 				'gradient-card': 'var(--gradient-card)',
+				'gradient-card-hover': 'var(--gradient-card-hover)',
+				'gradient-glass': 'var(--gradient-glass)',
+				'gradient-nav': 'var(--gradient-nav)',
+				'gradient-footer': 'var(--gradient-footer)',
 			},
 			boxShadow: {
+				'elevated': 'var(--shadow-elevated)',
+				'floating': 'var(--shadow-floating)',
 				'drama': 'var(--shadow-drama)',
 				'glow': 'var(--shadow-glow)',
+				'glow-secondary': 'var(--shadow-glow-secondary)',
 			},
 			transitionTimingFunction: {
 				'drama': 'cubic-bezier(0.4, 0, 0.2, 1)',
 				'bounce': 'cubic-bezier(0.68, -0.55, 0.265, 1.55)',
+				'smooth': 'ease-in-out',
 			},
 			keyframes: {
 				'accordion-down': {

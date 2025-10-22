@@ -11,6 +11,8 @@ import Dashboard from "./pages/Dashboard";
 import Analytics from "./pages/Analytics";
 import Templates from "./pages/Templates";
 import MyScripts from "./pages/MyScripts";
+import Collaborate from "./pages/Collaborate";
+import Predictions from "./pages/Predictions";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -30,6 +32,8 @@ const App = () => {
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/analytics" element={<Analytics />} />
               <Route path="/templates" element={<Templates />} />
+              <Route path="/collaborate" element={<Collaborate />} />
+              <Route path="/predictions" element={<Predictions />} />
               <Route path="/auth" element={<Auth />} />
               <Route path="/my-scripts" element={<MyScripts />} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

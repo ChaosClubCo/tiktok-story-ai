@@ -22,43 +22,85 @@ export const Header = () => {
   if (!user) return null;
 
   return (
-    <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="container mx-auto flex h-14 items-center justify-between px-4">
-        <div className="flex items-center space-x-4">
+    <header className="sticky top-0 z-50 bg-gradient-nav border-b border-border/50 backdrop-blur-lg shadow-elevated">
+      <div className="container mx-auto flex h-16 items-center justify-between px-4">
+        <div className="flex items-center space-x-6">
           <h2 
-            className="text-lg font-semibold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent cursor-pointer hover:opacity-80 transition-opacity"
+            className="text-xl font-bold bg-gradient-drama bg-clip-text text-transparent cursor-pointer hover:scale-105 transition-transform"
             onClick={() => navigate("/")}
           >
             MiniDrama
           </h2>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => navigate("/my-scripts")}
-            className={`flex items-center gap-2 ${location.pathname === '/my-scripts' ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:text-foreground'}`}
-          >
-            <FileText className="h-4 w-4" />
-            <span className="hidden sm:inline">My Scripts</span>
-          </Button>
+          <nav className="hidden md:flex items-center space-x-1">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => navigate("/")}
+              className={location.pathname === '/' ? 'bg-primary/10 text-primary' : ''}
+            >
+              Home
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => navigate("/dashboard")}
+              className={location.pathname === '/dashboard' ? 'bg-primary/10 text-primary' : ''}
+            >
+              Dashboard
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => navigate("/templates")}
+              className={location.pathname === '/templates' ? 'bg-primary/10 text-primary' : ''}
+            >
+              Templates
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => navigate("/collaborate")}
+              className={location.pathname === '/collaborate' ? 'bg-primary/10 text-primary' : ''}
+            >
+              Collaborate
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => navigate("/predictions")}
+              className={location.pathname === '/predictions' ? 'bg-primary/10 text-primary' : ''}
+            >
+              Predictions
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => navigate("/my-scripts")}
+              className={`flex items-center gap-2 ${location.pathname === '/my-scripts' ? 'bg-primary/10 text-primary' : ''}`}
+            >
+              <FileText className="h-4 w-4" />
+              My Scripts
+            </Button>
+          </nav>
         </div>
         
         <div className="flex items-center space-x-3">
-          <span className="text-sm text-muted-foreground hidden sm:block">
+          <span className="text-sm text-muted-foreground hidden lg:block">
             {user.email}
           </span>
-          <Avatar className="h-8 w-8">
-            <AvatarFallback className="text-xs">
+          <Avatar className="h-9 w-9 ring-2 ring-border/50 transition-all hover:ring-primary/50">
+            <AvatarFallback className="text-xs bg-gradient-drama text-primary-foreground font-semibold">
               {user.email?.charAt(0).toUpperCase()}
             </AvatarFallback>
           </Avatar>
           <Button
             variant="ghost"
-            size="sm"
+            size="icon"
             onClick={handleSignOut}
             className="text-muted-foreground hover:text-foreground"
+            title="Sign out"
           >
             <LogOut className="h-4 w-4" />
-            <span className="sr-only">Sign out</span>
           </Button>
         </div>
       </div>
