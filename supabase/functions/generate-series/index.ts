@@ -49,6 +49,49 @@ serve(async (req) => {
       );
     }
 
+    // Security: Input validation to prevent cost amplification and prompt injection
+    if (premise.length > 500) {
+      return new Response(
+        JSON.stringify({ error: 'Premise must be less than 500 characters' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    if (niche.length > 100) {
+      return new Response(
+        JSON.stringify({ error: 'Niche must be less than 100 characters' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    if (tone && tone.length > 50) {
+      return new Response(
+        JSON.stringify({ error: 'Tone must be less than 50 characters' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Sanitize inputs (remove control characters)
+    const sanitizedPremise = premise.replace(/[\x00-\x1F\x7F]/g, '').trim();
+    const sanitizedNiche = niche.replace(/[\x00-\x1F\x7F]/g, '').trim();
+    const sanitizedTone = tone ? tone.replace(/[\x00-\x1F\x7F]/g, '').trim() : '';
+
+    // Detect potential prompt injection attempts
+    const prohibitedPhrases = [
+      'ignore previous', 'disregard instructions', 'system prompt', 
+      'jailbreak', 'bypass', 'override'
+    ];
+    
+    const inputText = `${sanitizedPremise} ${sanitizedNiche} ${sanitizedTone}`.toLowerCase();
+    const hasProhibitedContent = prohibitedPhrases.some(phrase => inputText.includes(phrase));
+    
+    if (hasProhibitedContent) {
+      return new Response(
+        JSON.stringify({ error: 'Input contains prohibited content' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     if (episodeCount < 3 || episodeCount > 10) {
       return new Response(
         JSON.stringify({ error: 'Episode count must be between 3 and 10' }),
@@ -61,10 +104,10 @@ serve(async (req) => {
       .from('series')
       .insert({
         user_id: user.id,
-        title: `${premise} - Mini Drama Series`,
-        premise,
-        niche,
-        tone,
+        title: `${sanitizedPremise} - Mini Drama Series`,
+        premise: sanitizedPremise,
+        niche: sanitizedNiche,
+        tone: sanitizedTone,
         total_episodes: episodeCount,
         description: `A ${episodeCount}-part vertical drama series`
       })
@@ -83,9 +126,9 @@ serve(async (req) => {
 
     const biblePrompt = `Create a series bible for a ${episodeCount}-episode vertical video mini-drama series.
 
-PREMISE: ${premise}
-NICHE: ${niche}
-TONE: ${tone}
+PREMISE: ${sanitizedPremise}
+NICHE: ${sanitizedNiche}
+TONE: ${sanitizedTone}
 
 Generate a comprehensive series bible including:
 1. Main characters (2-3 characters with names, roles, motivations)
@@ -157,8 +200,8 @@ Duration: [60-90s]
 
 ${isLastEpisode ? '' : '[61-75s] CLIFFHANGER\n[Scene description and dialogue]\n\n[Preview for Episode ' + (i + 1) + ']'}
 
-Tone: ${tone}
-Niche: ${niche}`;
+Tone: ${sanitizedTone}
+Niche: ${sanitizedNiche}`;
 
       const episodeResponse = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
