@@ -13,6 +13,7 @@ import Templates from "./pages/Templates";
 import MyScripts from "./pages/MyScripts";
 import Collaborate from "./pages/Collaborate";
 import Predictions from "./pages/Predictions";
+import Series from "./pages/Series";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -34,6 +35,7 @@ const App = () => {
               <Route path="/templates" element={<Templates />} />
               <Route path="/collaborate" element={<Collaborate />} />
               <Route path="/predictions" element={<Predictions />} />
+              <Route path="/series" element={<Series />} />
               <Route path="/auth" element={<Auth />} />
               <Route path="/my-scripts" element={<MyScripts />} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
