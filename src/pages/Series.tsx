@@ -57,13 +57,13 @@ export default function Series() {
   const fetchSeries = async () => {
     try {
       const { data, error } = await supabase
-        .from('series')
+        .from('series' as any)
         .select('*')
         .eq('user_id', user?.id)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setSeries(data || []);
+      setSeries((data || []) as unknown as Series[]);
     } catch (error) {
       console.error('Error fetching series:', error);
       toast.error('Failed to load series');
@@ -110,7 +110,7 @@ export default function Series() {
 
     try {
       const { error } = await supabase
-        .from('series')
+        .from('series' as any)
         .delete()
         .eq('id', seriesId);
 

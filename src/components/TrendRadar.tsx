@@ -27,14 +27,14 @@ export const TrendRadar = ({ onGenerateFromTrend }: TrendRadarProps) => {
     const fetchTrends = async () => {
       try {
         const { data, error } = await supabase
-          .from('trending_topics')
+          .from('trending_topics' as any)
           .select('*')
           .eq('is_active', true)
           .order('viral_score', { ascending: false })
           .limit(8);
 
         if (error) throw error;
-        setTrends(data || []);
+        setTrends((data || []) as unknown as TrendingTopic[]);
       } catch (error) {
         console.error('Failed to fetch trends:', error);
       } finally {
