@@ -63,7 +63,7 @@ serve(async (req) => {
     logStep("User authenticated", { userId: user.id });
 
     const body = await req.json();
-    const { niche, length, tone, topic } = body;
+    const { niche, length, tone, topic, scriptMode = 'standard', trendId, templateId } = body;
     
     // Enhanced input validation and sanitization
     if (!niche || !length || !tone) {
@@ -87,12 +87,28 @@ serve(async (req) => {
       );
     }
 
-    // Content filtering - check for inappropriate content
-    const inappropriateWords = ['explicit', 'adult', 'nsfw', 'sexual', 'violence', 'hate', 'illegal'];
+    // Enhanced content filtering
+    const PROHIBITED_CONTENT = {
+      selfHarm: ['suicide', 'cutting', 'self-harm', 'kill myself'],
+      violence: ['murder', 'assault', 'abuse', 'torture'],
+      harassment: ['doxx', 'real name', 'address', 'phone number'],
+      illegalActivity: ['drugs', 'trafficking', 'fraud'],
+      hateSpeech: ['racial slur', 'homophobic', 'transphobic'],
+      explicit: ['explicit', 'adult', 'nsfw', 'sexual']
+    };
+    
     const allInputs = [niche, tone, topic || ''].join(' ').toLowerCase();
-    if (inappropriateWords.some(word => allInputs.includes(word))) {
+    const safetyFlags = [];
+    
+    for (const [category, keywords] of Object.entries(PROHIBITED_CONTENT)) {
+      if (keywords.some(keyword => allInputs.includes(keyword))) {
+        safetyFlags.push(category);
+      }
+    }
+    
+    if (safetyFlags.length > 0) {
       return new Response(
-        JSON.stringify({ error: "Request contains inappropriate content" }),
+        JSON.stringify({ error: "Request contains inappropriate content", categories: safetyFlags }),
         {
           status: 400,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -120,9 +136,69 @@ serve(async (req) => {
       );
     }
 
-    logStep("Generating script", { niche, length, tone, topic });
+    logStep("Generating script", { niche, length, tone, topic, scriptMode });
 
-    const prompt = `Generate a ${length} mini-drama script in the ${niche} niche with a ${tone} tone${topic ? ` about ${topic}` : ''}. 
+    // Mode-specific prompts
+    let prompt = '';
+    let systemMessage = 'You are a professional screenwriter who specializes in creating engaging mini-drama scripts for social media and short video content.';
+    
+    if (scriptMode === 'ai_storytime') {
+      systemMessage = 'You are an expert in creating viral AI voiceover storytime scripts. You specialize in chaotic, dramatic, embarrassing stories optimized for TTS delivery.';
+      prompt = `Generate a TTS-optimized AI voiceover storytime script for "${topic || niche}" in ${niche} niche.
+
+CRITICAL REQUIREMENTS:
+1. Write for AI voiceover pacing - use natural pauses, shorter sentences
+2. Include [PAUSE] markers every 3-5 seconds for B-roll cuts
+3. Use "chaotic, dramatic, embarrassing" storytelling style
+4. Start with a STRONG hook: "So this actually happened to me..."
+5. Include emotional peaks: shock, realization, punchline
+6. End with a viral callback or question
+
+FORMAT:
+[0-3s] HOOK: [opening line]
+[PAUSE - show reaction shot]
+[4-8s] SETUP: [scene setting]
+[PAUSE - show B-roll]
+[9-15s] ESCALATION: [conflict builds]
+[PAUSE - dramatic moment]
+[16-22s] CLIMAX: [peak moment]
+[PAUSE - reaction]
+[23-30s] PUNCHLINE: [twist or callback]
+
+Tone: ${tone}
+Length: ${length}
+Optimize for: Podcastle/ElevenLabs TTS
+
+IMPORTANT: This is FICTION ONLY. Do not use real people's names, specific locations, or anything that could be mistaken for real testimony. Add disclaimer at end: "This is a work of fiction."`;
+
+    } else if (scriptMode === 'pov_skit') {
+      systemMessage = 'You are an expert in creating viral POV (Point of View) mini-drama scripts with multiple hook variations for A/B testing.';
+      prompt = `Generate a POV (Point of View) mini-drama script for "${topic || niche}" in ${niche} niche.
+
+STRUCTURE:
+- Opening: "POV: You're [role] and [inciting incident] happens"
+- 3-5 scenes showing escalation
+- Each scene = 5-8 seconds
+- Include stage directions for acting
+- Dialogue should be punchy and quotable
+
+FIRST, generate 5 HOOK VARIATIONS (clearly labeled):
+HOOK 1: [variation]
+HOOK 2: [variation]
+HOOK 3: [variation]
+HOOK 4: [variation]
+HOOK 5: [variation]
+
+THEN, provide the CORE SPINE (main script with timestamps).
+
+Topic: ${topic || niche}
+Niche: ${niche}
+Tone: ${tone}
+Length: ${length}`;
+
+    } else {
+      // Standard mode
+      prompt = `Generate a ${length} mini-drama script in the ${niche} niche with a ${tone} tone${topic ? ` about ${topic}` : ''}. 
 
 Requirements:
 - Create an engaging title
@@ -133,6 +209,7 @@ Requirements:
 - Length should be appropriate for ${length} format
 
 Please provide both a title and the full script content.`;
+    }
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -145,7 +222,7 @@ Please provide both a title and the full script content.`;
         messages: [
           { 
             role: 'system', 
-            content: 'You are a professional screenwriter who specializes in creating engaging mini-drama scripts for social media and short video content. Your scripts should be emotionally compelling, well-structured, and suitable for the specified niche and tone.' 
+            content: systemMessage
           },
           { role: 'user', content: prompt }
         ],
@@ -165,6 +242,31 @@ Please provide both a title and the full script content.`;
     const lines = generatedContent.split('\n');
     let title = '';
     let content = generatedContent;
+    let hookVariations: string[] = [];
+    let beatMarkers: any[] = [];
+    
+    // Extract hook variations for POV mode
+    if (scriptMode === 'pov_skit') {
+      const hookMatches = generatedContent.matchAll(/HOOK\s*\d+:\s*(.+)/gi);
+      hookVariations = Array.from(hookMatches).map(match => match[1].trim());
+    }
+    
+    // Extract beat markers for AI storytime mode
+    if (scriptMode === 'ai_storytime') {
+      const timestampRegex = /\[(\d+-\d+s)\]\s*([^:]+):\s*([^\[]+)/g;
+      let match;
+      while ((match = timestampRegex.exec(generatedContent)) !== null) {
+        const [, timestamp, label, text] = match;
+        const [start, end] = timestamp.replace('s', '').split('-').map(Number);
+        beatMarkers.push({ start, end, label: label.trim(), text: text.trim() });
+      }
+      
+      // Extract pause markers
+      const pauseMatches = generatedContent.matchAll(/\[PAUSE\s*-\s*([^\]]+)\]/g);
+      for (const pauseMatch of pauseMatches) {
+        beatMarkers.push({ type: 'pause', action: pauseMatch[1].trim() });
+      }
+    }
     
     // Try to extract title if it's clearly marked
     const titleMatch = generatedContent.match(/(?:Title:|TITLE:)\s*(.+)/i);
@@ -178,11 +280,18 @@ Please provide both a title and the full script content.`;
         title = firstLine;
         content = lines.slice(1).join('\n').trim();
       } else {
-        title = `${niche} Mini-Drama - ${tone} Tone`;
+        title = scriptMode === 'ai_storytime' ? 'AI Storytime Script' : 
+                scriptMode === 'pov_skit' ? 'POV Skit Script' :
+                `${niche} Mini-Drama - ${tone} Tone`;
       }
     }
 
-    logStep("Script generated successfully", { titleLength: title.length, contentLength: content.length });
+    logStep("Script generated successfully", { 
+      titleLength: title.length, 
+      contentLength: content.length,
+      hookCount: hookVariations.length,
+      beatMarkerCount: beatMarkers.length
+    });
 
     return new Response(JSON.stringify({ 
       title,
@@ -190,7 +299,13 @@ Please provide both a title and the full script content.`;
       niche,
       length,
       tone,
-      topic
+      topic,
+      scriptMode,
+      hookVariations: hookVariations.length > 0 ? hookVariations : undefined,
+      beatMarkers: beatMarkers.length > 0 ? beatMarkers : undefined,
+      ttsOptimized: scriptMode === 'ai_storytime',
+      fictionDisclaimer: scriptMode === 'ai_storytime',
+      trendId: trendId || null
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

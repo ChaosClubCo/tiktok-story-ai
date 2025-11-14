@@ -75,6 +75,14 @@ export const Header = () => {
             <Button
               variant="ghost"
               size="sm"
+              onClick={() => navigate("/series")}
+              className={location.pathname === '/series' ? 'bg-primary/10 text-primary' : ''}
+            >
+              Series
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={() => navigate("/my-scripts")}
               className={`flex items-center gap-2 ${location.pathname === '/my-scripts' ? 'bg-primary/10 text-primary' : ''}`}
             >
