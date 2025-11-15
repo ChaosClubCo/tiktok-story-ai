@@ -7,13 +7,79 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instanciate createClient with right options
+  // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
     PostgrestVersion: "12.2.12 (cd3cf9e)"
   }
   public: {
     Tables: {
+      admin_audit_log: {
+        Row: {
+          action: string
+          admin_id: string
+          created_at: string | null
+          id: string
+          ip_address: unknown
+          metadata: Json | null
+          reason: string | null
+          resource_id: string | null
+          resource_type: string | null
+          user_agent: string | null
+        }
+        Insert: {
+          action: string
+          admin_id: string
+          created_at?: string | null
+          id?: string
+          ip_address?: unknown
+          metadata?: Json | null
+          reason?: string | null
+          resource_id?: string | null
+          resource_type?: string | null
+          user_agent?: string | null
+        }
+        Update: {
+          action?: string
+          admin_id?: string
+          created_at?: string | null
+          id?: string
+          ip_address?: unknown
+          metadata?: Json | null
+          reason?: string | null
+          resource_id?: string | null
+          resource_type?: string | null
+          user_agent?: string | null
+        }
+        Relationships: []
+      }
+      admin_roles: {
+        Row: {
+          expires_at: string | null
+          granted_at: string | null
+          granted_by: string | null
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          expires_at?: string | null
+          granted_at?: string | null
+          granted_by?: string | null
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          expires_at?: string | null
+          granted_at?: string | null
+          granted_by?: string | null
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string
@@ -40,40 +106,114 @@ export type Database = {
       }
       scripts: {
         Row: {
+          beat_markers: Json | null
           content: string
+          content_safety_flags: Json | null
           created_at: string
+          episode_number: number | null
+          fiction_disclaimer: boolean | null
+          hook_variations: Json | null
           id: string
           length: string
           niche: string
+          script_mode: string | null
+          series_id: string | null
           title: string
           tone: string
           topic: string | null
+          trend_id: string | null
+          tts_optimized: boolean | null
           updated_at: string
           user_id: string
         }
         Insert: {
+          beat_markers?: Json | null
           content: string
+          content_safety_flags?: Json | null
           created_at?: string
+          episode_number?: number | null
+          fiction_disclaimer?: boolean | null
+          hook_variations?: Json | null
           id?: string
           length: string
           niche: string
+          script_mode?: string | null
+          series_id?: string | null
           title: string
           tone: string
           topic?: string | null
+          trend_id?: string | null
+          tts_optimized?: boolean | null
           updated_at?: string
           user_id: string
         }
         Update: {
+          beat_markers?: Json | null
           content?: string
+          content_safety_flags?: Json | null
           created_at?: string
+          episode_number?: number | null
+          fiction_disclaimer?: boolean | null
+          hook_variations?: Json | null
           id?: string
           length?: string
           niche?: string
+          script_mode?: string | null
+          series_id?: string | null
           title?: string
           tone?: string
           topic?: string | null
+          trend_id?: string | null
+          tts_optimized?: boolean | null
           updated_at?: string
           user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_scripts_series"
+            columns: ["series_id"]
+            isOneToOne: false
+            referencedRelation: "series"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      series: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          id: string
+          niche: string | null
+          premise: string | null
+          title: string
+          tone: string | null
+          total_episodes: number | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          niche?: string | null
+          premise?: string | null
+          title: string
+          tone?: string | null
+          total_episodes?: number | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          niche?: string | null
+          premise?: string | null
+          title?: string
+          tone?: string | null
+          total_episodes?: number | null
+          updated_at?: string | null
+          user_id?: string | null
         }
         Relationships: []
       }
@@ -113,15 +253,58 @@ export type Database = {
         }
         Relationships: []
       }
+      trending_topics: {
+        Row: {
+          category: string | null
+          engagement_count: string | null
+          id: string
+          is_active: boolean | null
+          last_updated: string | null
+          metadata: Json | null
+          platform: string | null
+          topic: string
+          viral_score: number | null
+        }
+        Insert: {
+          category?: string | null
+          engagement_count?: string | null
+          id: string
+          is_active?: boolean | null
+          last_updated?: string | null
+          metadata?: Json | null
+          platform?: string | null
+          topic: string
+          viral_score?: number | null
+        }
+        Update: {
+          category?: string | null
+          engagement_count?: string | null
+          id?: string
+          is_active?: boolean | null
+          last_updated?: string | null
+          metadata?: Json | null
+          platform?: string | null
+          topic?: string
+          viral_score?: number | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
+      is_admin: { Args: { _user_id: string }; Returns: boolean }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "super_admin" | "support_admin" | "content_moderator" | "user"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -248,6 +431,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["super_admin", "support_admin", "content_moderator", "user"],
+    },
   },
 } as const
