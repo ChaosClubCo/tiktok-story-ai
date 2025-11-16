@@ -18,6 +18,7 @@ import { CinematicHeroBackground } from "@/components/CinematicHeroBackground";
 import { DifferentiationTable } from "@/components/DifferentiationTable";
 import { LiveSocialProofFeed } from "@/components/LiveSocialProofFeed";
 import { LandingViralPredictorCard } from "@/components/LandingViralPredictorCard";
+import { SeriesShowcaseSection } from "@/components/SeriesShowcaseSection";
 import { Sparkles, TrendingUp, Zap } from "lucide-react";
 
 // Mock script generation - in real app, this would call an AI API
@@ -310,6 +311,9 @@ const Index = () => {
 
       {/* Differentiation Table */}
       <DifferentiationTable />
+
+      {/* Series Showcase */}
+      <SeriesShowcaseSection />
 
       {/* Main Content */}
       <div id="niche-selector" className="container mx-auto px-4 py-16 space-y-16">
