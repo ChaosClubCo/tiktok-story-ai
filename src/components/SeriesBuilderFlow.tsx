@@ -16,7 +16,9 @@ import {
   FileText,
   Hash,
   Palette,
-  Loader2
+  Loader2,
+  Lightbulb,
+  RefreshCw
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -54,6 +56,9 @@ export const SeriesBuilderFlow = () => {
 
   const [currentStep, setCurrentStep] = useState(1);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [suggestions, setSuggestions] = useState<any[]>([]);
+  const [loadingSuggestions, setLoadingSuggestions] = useState(false);
+  const [remixTemplate, setRemixTemplate] = useState<SeriesTemplate | null>(null);
   
   const [formData, setFormData] = useState({
     title: '',
@@ -77,6 +82,7 @@ export const SeriesBuilderFlow = () => {
       const storedTemplate = localStorage.getItem('remix_series_template');
       if (storedTemplate) {
         const template: SeriesTemplate = JSON.parse(storedTemplate);
+        setRemixTemplate(template);
         setFormData(prev => ({
           ...prev,
           title: template.title,
@@ -90,6 +96,74 @@ export const SeriesBuilderFlow = () => {
 
     analytics.track('series_builder_viewed', { remixId });
   }, [user, remixId, navigate]);
+
+  // Fetch suggestions when step changes
+  useEffect(() => {
+    if (currentStep <= 3 && user) {
+      fetchSuggestions();
+    }
+  }, [currentStep, user]);
+
+  const fetchSuggestions = async () => {
+    setLoadingSuggestions(true);
+    setSuggestions([]);
+
+    try {
+      const context: any = {
+        niche: formData.niche,
+      };
+
+      if (currentStep === 1) {
+        // Title suggestions
+        if (remixTemplate?.title) {
+          context.remixTitle = remixTemplate.title;
+        }
+      } else if (currentStep === 2) {
+        // Logline suggestions
+        context.title = formData.title;
+        if (remixTemplate?.logline) {
+          context.remixLogline = remixTemplate.logline;
+        }
+      } else if (currentStep === 3) {
+        // Episode structure suggestions
+        context.title = formData.title;
+        context.logline = formData.logline;
+      }
+
+      const { data, error } = await supabase.functions.invoke('generate-series-suggestions', {
+        body: { step: currentStep, context }
+      });
+
+      if (error) throw error;
+
+      if (data?.suggestions) {
+        setSuggestions(data.suggestions);
+        analytics.track('series_suggestions_generated', { 
+          step: currentStep, 
+          count: data.suggestions.length 
+        });
+      }
+    } catch (error: any) {
+      console.error('Error fetching suggestions:', error);
+      // Don't show error toast for rate limits or credits - user can still proceed manually
+      if (error.message?.includes('Rate limit') || error.message?.includes('credits')) {
+        setSuggestions([]);
+      }
+    } finally {
+      setLoadingSuggestions(false);
+    }
+  };
+
+  const applySuggestion = (suggestion: any) => {
+    if (currentStep === 1) {
+      setFormData(prev => ({ ...prev, title: suggestion }));
+    } else if (currentStep === 2) {
+      setFormData(prev => ({ ...prev, logline: suggestion }));
+    } else if (currentStep === 3) {
+      setFormData(prev => ({ ...prev, episodes: suggestion.episodes }));
+    }
+    analytics.track('series_suggestion_applied', { step: currentStep });
+  };
 
   const handleNext = () => {
     // Validate current step
@@ -185,6 +259,9 @@ export const SeriesBuilderFlow = () => {
                 </p>
               </div>
             )}
+
+            {/* AI Suggestions */}
+            {renderSuggestions()}
           </div>
         );
 
@@ -220,6 +297,9 @@ export const SeriesBuilderFlow = () => {
                 [Main Character/Situation] + [Faces/Discovers] + [Compelling Hook/Twist]
               </p>
             </div>
+
+            {/* AI Suggestions */}
+            {renderSuggestions()}
           </div>
         );
 
@@ -256,6 +336,9 @@ export const SeriesBuilderFlow = () => {
                 📊 <strong>Recommended:</strong> 5-7 episodes for quick series, 10-15 for deep storytelling
               </p>
             </div>
+
+            {/* AI Suggestions */}
+            {renderSuggestions()}
           </div>
         );
 
@@ -317,6 +400,74 @@ export const SeriesBuilderFlow = () => {
       default:
         return null;
     }
+  };
+
+  const renderSuggestions = () => {
+    if (currentStep > 3) return null;
+
+    return (
+      <div className="space-y-3 p-4 rounded-lg bg-gradient-subtle border border-border/30">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Lightbulb className="w-5 h-5 text-primary" />
+            <h4 className="font-semibold text-foreground">
+              AI Suggestions
+            </h4>
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={fetchSuggestions}
+            disabled={loadingSuggestions}
+            className="gap-1"
+          >
+            <RefreshCw className={`w-3 h-3 ${loadingSuggestions ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+        </div>
+
+        {loadingSuggestions ? (
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="w-6 h-6 animate-spin text-primary" />
+          </div>
+        ) : suggestions.length > 0 ? (
+          <div className="space-y-2">
+            {suggestions.map((suggestion, index) => (
+              <button
+                key={index}
+                onClick={() => applySuggestion(suggestion)}
+                className="w-full text-left p-3 rounded-md bg-background/50 border border-border/50 hover:border-primary/50 hover:bg-card-elevated transition-all group"
+              >
+                {currentStep === 3 ? (
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <div className="font-semibold text-foreground group-hover:text-primary transition-colors">
+                        {suggestion.episodes} Episodes
+                      </div>
+                      <div className="text-xs text-muted-foreground mt-1">
+                        {suggestion.reason}
+                      </div>
+                    </div>
+                    <Sparkles className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors flex-shrink-0 mt-1" />
+                  </div>
+                ) : (
+                  <div className="flex items-start justify-between gap-2">
+                    <span className="text-sm text-foreground group-hover:text-primary transition-colors flex-1">
+                      {suggestion}
+                    </span>
+                    <Sparkles className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors flex-shrink-0 mt-0.5" />
+                  </div>
+                )}
+              </button>
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground text-center py-4">
+            Click refresh to generate AI suggestions
+          </p>
+        )}
+      </div>
+    );
   };
 
   return (

@@ -19,6 +19,9 @@ verify_jwt = true
 [functions.demo-viral-score]
 verify_jwt = false
 
+[functions.generate-series-suggestions]
+verify_jwt = true
+
 [functions.send-registration-email]
 verify_jwt = true
 
