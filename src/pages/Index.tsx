@@ -277,18 +277,30 @@ const Index = () => {
               size="lg" 
               className="text-lg px-8 py-6 shadow-glow hover:shadow-glow hover:scale-105 transition-all"
               onClick={() => {
-                document.getElementById('niche-selector')?.scrollIntoView({ behavior: 'smooth' });
+                if (user) {
+                  navigate('/series/builder');
+                } else {
+                  navigate('/auth');
+                }
               }}
             >
+              <Sparkles className="w-5 h-5 mr-2" />
               Generate Your First Series
             </Button>
             <Button 
               size="lg" 
-              variant="outline" 
-              className="text-lg px-8 py-6 hover:bg-card hover:scale-105 transition-all"
-              onClick={() => navigate("/series")}
+              variant="secondary" 
+              className="text-lg px-8 py-6 hover:scale-105 transition-all"
+              onClick={() => {
+                if (user) {
+                  navigate('/series/builder?from=trend');
+                } else {
+                  navigate('/auth');
+                }
+              }}
             >
-              See How It Works
+              <TrendingUp className="w-5 h-5 mr-2" />
+              Generate from Trend
             </Button>
           </div>
 

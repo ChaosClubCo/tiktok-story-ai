@@ -18,12 +18,14 @@ import {
   Palette,
   Loader2,
   Lightbulb,
-  RefreshCw
+  RefreshCw,
+  TrendingUp
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import { analytics } from "@/lib/analytics";
+import { TrendRadar } from "@/components/TrendRadar";
 
 interface SeriesTemplate {
   title: string;
@@ -59,6 +61,7 @@ export const SeriesBuilderFlow = () => {
   const [suggestions, setSuggestions] = useState<any[]>([]);
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
   const [remixTemplate, setRemixTemplate] = useState<SeriesTemplate | null>(null);
+  const [selectedTrendId, setSelectedTrendId] = useState<string | null>(null);
   
   const [formData, setFormData] = useState({
     title: '',
@@ -163,6 +166,13 @@ export const SeriesBuilderFlow = () => {
       setFormData(prev => ({ ...prev, episodes: suggestion.episodes }));
     }
     analytics.track('series_suggestion_applied', { step: currentStep });
+  };
+
+  const handleGenerateFromTrend = (trendId: string, topic: string) => {
+    setSelectedTrendId(trendId);
+    setFormData(prev => ({ ...prev, title: topic }));
+    analytics.track('trend_applied', { trendId, topic });
+    toast.success(`🔥 Trend applied: "${topic}"`);
   };
 
   const handleNext = () => {
@@ -488,6 +498,32 @@ export const SeriesBuilderFlow = () => {
           </div>
           <Progress value={progress} className="h-2" />
         </div>
+
+        {/* Trending Topics - Only show on Step 1 */}
+        {currentStep === 1 && (
+          <Card className="mb-6 shadow-elevated border-primary/20 bg-gradient-to-br from-card to-card-elevated">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <TrendingUp className="w-5 h-5 text-primary animate-pulse" />
+                Start from a Trending Topic
+              </CardTitle>
+              <CardDescription>
+                Jump-start your series with real-time viral trends
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <TrendRadar onGenerateFromTrend={handleGenerateFromTrend} />
+              {selectedTrendId && (
+                <div className="mt-4 p-3 bg-primary/10 border border-primary/20 rounded-lg">
+                  <p className="text-sm text-foreground flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-primary" />
+                    Trend applied! Continue customizing below or generate directly.
+                  </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
 
         {/* Main Card */}
         <Card className="shadow-glow border-border/50 bg-card-elevated">
