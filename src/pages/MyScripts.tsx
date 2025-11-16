@@ -4,9 +4,12 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
-import { Trash2, Download, Eye } from "lucide-react";
+import { Trash2, Download, Eye, CheckSquare, Square, Loader2 } from "lucide-react";
 import { Header } from "@/components/Header";
+import { useNavigate } from "react-router-dom";
 
 interface SavedScript {
   id: string;
@@ -19,11 +22,23 @@ interface SavedScript {
   created_at: string;
 }
 
+interface BatchAnalysisResult {
+  id: string;
+  title: string;
+  status: 'pending' | 'analyzing' | 'completed' | 'failed';
+  viralScore?: number;
+}
+
 const MyScripts = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [scripts, setScripts] = useState<SavedScript[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedScript, setSelectedScript] = useState<any>(null);
+  const [selectedScriptIds, setSelectedScriptIds] = useState<Set<string>>(new Set());
+  const [batchAnalyzing, setBatchAnalyzing] = useState(false);
+  const [batchProgress, setBatchProgress] = useState({ current: 0, total: 0 });
+  const [batchResults, setBatchResults] = useState<BatchAnalysisResult[]>([]);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -123,6 +138,105 @@ const MyScripts = () => {
     }
   };
 
+  const toggleScriptSelection = (scriptId: string) => {
+    const newSelection = new Set(selectedScriptIds);
+    if (newSelection.has(scriptId)) {
+      newSelection.delete(scriptId);
+    } else {
+      newSelection.add(scriptId);
+    }
+    setSelectedScriptIds(newSelection);
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedScriptIds.size === scripts.length) {
+      setSelectedScriptIds(new Set());
+    } else {
+      setSelectedScriptIds(new Set(scripts.map(s => s.id)));
+    }
+  };
+
+  const handleBatchAnalysis = async () => {
+    if (selectedScriptIds.size === 0) {
+      toast({
+        title: "No Scripts Selected",
+        description: "Please select at least one script to analyze",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (selectedScriptIds.size > 10) {
+      toast({
+        title: "Too Many Scripts",
+        description: "Please select a maximum of 10 scripts for batch analysis",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setBatchAnalyzing(true);
+    const scriptsToAnalyze = scripts.filter(s => selectedScriptIds.has(s.id));
+    setBatchProgress({ current: 0, total: scriptsToAnalyze.length });
+    setBatchResults(scriptsToAnalyze.map(s => ({ 
+      id: s.id, 
+      title: s.title, 
+      status: 'pending' as 'pending' | 'analyzing' | 'completed' | 'failed'
+    })));
+
+    let completed = 0;
+    const results: BatchAnalysisResult[] = scriptsToAnalyze.map(s => ({ 
+      id: s.id, 
+      title: s.title, 
+      status: 'pending' as 'pending' | 'analyzing' | 'completed' | 'failed'
+    }));
+
+    for (let i = 0; i < scriptsToAnalyze.length; i++) {
+      const script = scriptsToAnalyze[i];
+      
+      // Update status to analyzing
+      results[i] = { ...results[i], status: 'analyzing' };
+      setBatchResults([...results]);
+
+      try {
+        const { data, error } = await supabase.functions.invoke('analyze-script', {
+          body: {
+            scriptId: script.id,
+            content: script.content,
+            title: script.title,
+            niche: script.niche
+          }
+        });
+
+        if (error) throw error;
+
+        results[i] = { 
+          ...results[i], 
+          status: 'completed',
+          viralScore: data?.viral_score 
+        };
+        completed++;
+        
+        // Add delay between requests (2 seconds)
+        if (i < scriptsToAnalyze.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 2000));
+        }
+      } catch (error) {
+        console.error(`Error analyzing script ${script.title}:`, error);
+        results[i] = { ...results[i], status: 'failed' };
+      }
+
+      setBatchProgress({ current: i + 1, total: scriptsToAnalyze.length });
+      setBatchResults([...results]);
+    }
+
+    setBatchAnalyzing(false);
+    toast({
+      title: "Batch Analysis Complete",
+      description: `Successfully analyzed ${completed} of ${scriptsToAnalyze.length} scripts`,
+    });
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-hero">
@@ -150,6 +264,110 @@ const MyScripts = () => {
           </p>
         </div>
 
+        {/* Batch Selection Controls */}
+        {scripts.length > 0 && (
+          <div className="flex flex-wrap items-center justify-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={toggleSelectAll}
+            >
+              {selectedScriptIds.size === scripts.length ? (
+                <>
+                  <CheckSquare className="h-4 w-4 mr-2" />
+                  Deselect All
+                </>
+              ) : (
+                <>
+                  <Square className="h-4 w-4 mr-2" />
+                  Select All
+                </>
+              )}
+            </Button>
+            
+            {selectedScriptIds.size > 0 && (
+              <Button
+                onClick={handleBatchAnalysis}
+                disabled={batchAnalyzing}
+                className="bg-gradient-to-r from-primary to-primary/80"
+              >
+                {batchAnalyzing ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Analyzing {batchProgress.current}/{batchProgress.total}
+                  </>
+                ) : (
+                  <>Analyze Selected ({selectedScriptIds.size})</>
+                )}
+              </Button>
+            )}
+          </div>
+        )}
+        
+        {/* Batch Progress */}
+        {batchAnalyzing && (
+          <Card className="p-4 bg-gradient-to-r from-primary/5 to-secondary/5">
+            <div className="space-y-2">
+              <div className="flex justify-between text-sm">
+                <span className="font-medium">Batch Analysis Progress</span>
+                <span className="text-muted-foreground">
+                  {batchProgress.current} of {batchProgress.total} completed
+                </span>
+              </div>
+              <Progress 
+                value={(batchProgress.current / batchProgress.total) * 100} 
+                className="h-2"
+              />
+            </div>
+          </Card>
+        )}
+        
+        {/* Batch Results */}
+        {batchResults.length > 0 && !batchAnalyzing && (
+          <Card className="p-4">
+            <div className="space-y-2">
+              <div className="flex justify-between items-center mb-3">
+                <h3 className="font-semibold">Analysis Results</h3>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => {
+                    navigate('/predictions');
+                    setBatchResults([]);
+                  }}
+                >
+                  View Full Analysis
+                </Button>
+              </div>
+              <div className="grid gap-2">
+                {batchResults.map((result) => (
+                  <div key={result.id} className="flex items-center justify-between p-2 rounded-lg bg-muted/50">
+                    <span className="text-sm font-medium truncate flex-1">{result.title}</span>
+                    <div className="flex items-center gap-2">
+                      {result.status === 'completed' && result.viralScore && (
+                        <Badge variant="default" className="ml-2">
+                          Viral Score: {result.viralScore}
+                        </Badge>
+                      )}
+                      <Badge 
+                        variant={
+                          result.status === 'completed' ? 'default' : 
+                          result.status === 'failed' ? 'destructive' : 
+                          result.status === 'analyzing' ? 'secondary' : 
+                          'outline'
+                        }
+                      >
+                        {result.status === 'analyzing' && <Loader2 className="h-3 w-3 mr-1 animate-spin" />}
+                        {result.status.charAt(0).toUpperCase() + result.status.slice(1)}
+                      </Badge>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </Card>
+        )}
+
         {scripts.length === 0 ? (
           <Card className="p-8 text-center bg-gradient-card backdrop-blur-sm border border-border/50">
             <div className="text-6xl mb-4">📝</div>
@@ -164,44 +382,53 @@ const MyScripts = () => {
         ) : (
           <div className="grid gap-6">
             {scripts.map((script) => (
-              <Card key={script.id} className="p-6 bg-gradient-card backdrop-blur-sm border border-border/50">
-                <div className="flex justify-between items-start mb-4">
-                  <div className="space-y-2">
-                    <h3 className="text-xl font-bold">{script.title}</h3>
-                    <div className="flex flex-wrap gap-2">
-                      <Badge variant="secondary">{script.niche}</Badge>
-                      <Badge variant="outline">{script.length}</Badge>
-                      <Badge variant="outline">{script.tone}</Badge>
-                      {script.topic && <Badge variant="outline">{script.topic}</Badge>}
+              <Card key={script.id} className="p-6 bg-gradient-card backdrop-blur-sm border border-border/50 relative">
+                <div className="absolute top-4 left-4 z-10">
+                  <Checkbox
+                    checked={selectedScriptIds.has(script.id)}
+                    onCheckedChange={() => toggleScriptSelection(script.id)}
+                    className="h-5 w-5 border-2"
+                  />
+                </div>
+                <div className="pl-10">
+                  <div className="flex justify-between items-start mb-4">
+                    <div className="space-y-2">
+                      <h3 className="text-xl font-bold">{script.title}</h3>
+                      <div className="flex flex-wrap gap-2">
+                        <Badge variant="secondary">{script.niche}</Badge>
+                        <Badge variant="outline">{script.length}</Badge>
+                        <Badge variant="outline">{script.tone}</Badge>
+                        {script.topic && <Badge variant="outline">{script.topic}</Badge>}
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        Created: {new Date(script.created_at).toLocaleDateString()}
+                      </p>
                     </div>
-                    <p className="text-sm text-muted-foreground">
-                      Created: {new Date(script.created_at).toLocaleDateString()}
-                    </p>
-                  </div>
-                  
-                  <div className="flex gap-2">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleView(script)}
-                    >
-                      <Eye className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleExport(script)}
-                    >
-                      <Download className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleDelete(script.id)}
-                      className="text-destructive hover:text-destructive"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    
+                    <div className="flex gap-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleView(script)}
+                      >
+                        <Eye className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleExport(script)}
+                      >
+                        <Download className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleDelete(script.id)}
+                        className="text-destructive hover:text-destructive"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </Card>

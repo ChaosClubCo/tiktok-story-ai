@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { 
   TrendingUp, 
   TrendingDown, 
@@ -15,11 +17,16 @@ import {
   Trash2,
   ChevronRight,
   Lightbulb,
-  LineChart as LineChartIcon
+  LineChart as LineChartIcon,
+  Download,
+  FileDown,
+  CalendarIcon,
+  X
 } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { cn } from "@/lib/utils";
 
 interface PredictionRecord {
   id: string;
@@ -51,6 +58,10 @@ export const PredictionHistory = () => {
   const [comparisonMode, setComparisonMode] = useState(false);
   const [comparisonPredictions, setComparisonPredictions] = useState<[PredictionRecord | null, PredictionRecord | null]>([null, null]);
   const [viewMode, setViewMode] = useState<'list' | 'trends'>('list');
+  const [dateRange, setDateRange] = useState<{ from: Date | undefined; to: Date | undefined }>({
+    from: undefined,
+    to: undefined
+  });
 
   useEffect(() => {
     fetchPredictions();
@@ -106,9 +117,23 @@ export const PredictionHistory = () => {
     };
   };
 
-  const filteredPredictions = predictions.filter(p => 
-    filter === 'all' || p.prediction_type === filter
-  );
+  const filteredPredictions = predictions.filter(p => {
+    // Filter by type
+    if (filter !== 'all' && p.prediction_type !== filter) return false;
+    
+    // Filter by date range
+    if (dateRange.from || dateRange.to) {
+      const predictionDate = new Date(p.created_at);
+      if (dateRange.from && predictionDate < dateRange.from) return false;
+      if (dateRange.to) {
+        const endOfDay = new Date(dateRange.to);
+        endOfDay.setHours(23, 59, 59, 999);
+        if (predictionDate > endOfDay) return false;
+      }
+    }
+    
+    return true;
+  });
 
   const getScoreColor = (score: number) => {
     if (score >= 80) return "text-success";
@@ -157,6 +182,101 @@ export const PredictionHistory = () => {
     }));
   };
 
+  const exportToCSV = () => {
+    const headers = [
+      'Date', 'Title', 'Type', 'Viral Score', 'Engagement', 'Shareability', 
+      'Hook', 'Emotional', 'Conflict', 'Pacing', 'Dialogue', 'Quotability', 
+      'Relatability', 'Top Recommendation'
+    ];
+    
+    const rows = filteredPredictions.map(p => {
+      const topRec = Array.isArray(p.recommendations) && p.recommendations.length > 0 
+        ? p.recommendations[0] 
+        : 'N/A';
+      
+      return [
+        format(new Date(p.created_at), 'yyyy-MM-dd HH:mm'),
+        `"${p.title.replace(/"/g, '""')}"`,
+        p.prediction_type,
+        p.viral_score,
+        p.engagement_score,
+        p.shareability_score,
+        p.hook_strength,
+        p.emotional_impact,
+        p.conflict_clarity,
+        p.pacing_quality,
+        p.dialogue_quality,
+        p.quotability,
+        p.relatability,
+        `"${String(topRec).replace(/"/g, '""')}"`
+      ].join(',');
+    });
+    
+    const csv = [headers.join(','), ...rows].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `predictions_export_${format(new Date(), 'yyyy-MM-dd_HHmm')}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
+    toast.success(`${filteredPredictions.length} predictions exported to CSV`);
+  };
+
+  const exportToJSON = () => {
+    const exportData = {
+      exportDate: new Date().toISOString(),
+      totalPredictions: filteredPredictions.length,
+      filters: {
+        type: filter,
+        dateRange: dateRange.from || dateRange.to ? {
+          from: dateRange.from?.toISOString(),
+          to: dateRange.to?.toISOString()
+        } : null
+      },
+      predictions: filteredPredictions
+    };
+    
+    const json = JSON.stringify(exportData, null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `predictions_export_${format(new Date(), 'yyyy-MM-dd_HHmm')}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
+    toast.success(`${filteredPredictions.length} predictions exported to JSON`);
+  };
+
+  const clearDateRange = () => {
+    setDateRange({ from: undefined, to: undefined });
+  };
+
+  const setDateRangePreset = (preset: 'week' | 'month' | 'quarter') => {
+    const today = new Date();
+    const from = new Date();
+    
+    switch (preset) {
+      case 'week':
+        from.setDate(today.getDate() - 7);
+        break;
+      case 'month':
+        from.setDate(today.getDate() - 30);
+        break;
+      case 'quarter':
+        from.setDate(today.getDate() - 90);
+        break;
+    }
+    
+    setDateRange({ from, to: today });
+  };
+
   if (loading) {
     return (
       <Card className="bg-card-elevated border-border/50">
@@ -184,26 +304,94 @@ export const PredictionHistory = () => {
 
   return (
     <div className="space-y-6">
-      {/* View Mode Tabs */}
-      <div className="flex gap-2">
-        <Button
-          variant={viewMode === 'list' ? 'default' : 'outline'}
-          size="sm"
-          onClick={() => setViewMode('list')}
-          className="gap-2"
-        >
-          <Clock className="w-4 h-4" />
-          History List
-        </Button>
-        <Button
-          variant={viewMode === 'trends' ? 'default' : 'outline'}
-          size="sm"
-          onClick={() => setViewMode('trends')}
-          className="gap-2"
-        >
-          <LineChartIcon className="w-4 h-4" />
-          Trends
-        </Button>
+      {/* Header with Controls */}
+      <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
+        {/* View Mode Tabs */}
+        <div className="flex gap-2">
+          <Button
+            variant={viewMode === 'list' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setViewMode('list')}
+            className="gap-2"
+          >
+            <Clock className="w-4 h-4" />
+            History List
+          </Button>
+          <Button
+            variant={viewMode === 'trends' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setViewMode('trends')}
+            className="gap-2"
+          >
+            <LineChartIcon className="w-4 h-4" />
+            Trends
+          </Button>
+        </div>
+
+        {/* Filters and Export */}
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Date Range Filter */}
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm" className={cn(
+                "justify-start text-left font-normal",
+                (dateRange.from || dateRange.to) && "border-primary"
+              )}>
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {dateRange.from ? (
+                  dateRange.to ? (
+                    <>
+                      {format(dateRange.from, "MMM dd")} - {format(dateRange.to, "MMM dd")}
+                    </>
+                  ) : (
+                    format(dateRange.from, "MMM dd, yyyy")
+                  )
+                ) : (
+                  <span>Date Range</span>
+                )}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="end">
+              <div className="p-3 space-y-2 border-b">
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" onClick={() => setDateRangePreset('week')}>
+                    Last 7 Days
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => setDateRangePreset('month')}>
+                    Last 30 Days
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => setDateRangePreset('quarter')}>
+                    Last 90 Days
+                  </Button>
+                </div>
+              </div>
+              <Calendar
+                mode="range"
+                selected={{ from: dateRange.from, to: dateRange.to }}
+                onSelect={(range) => setDateRange({ from: range?.from, to: range?.to })}
+                numberOfMonths={2}
+                className="pointer-events-auto"
+              />
+            </PopoverContent>
+          </Popover>
+          
+          {(dateRange.from || dateRange.to) && (
+            <Button variant="ghost" size="sm" onClick={clearDateRange}>
+              <X className="h-4 w-4 mr-1" />
+              Clear
+            </Button>
+          )}
+          
+          {/* Export Buttons */}
+          <Button variant="outline" size="sm" onClick={exportToCSV} disabled={filteredPredictions.length === 0}>
+            <FileDown className="h-4 w-4 mr-2" />
+            CSV
+          </Button>
+          <Button variant="outline" size="sm" onClick={exportToJSON} disabled={filteredPredictions.length === 0}>
+            <Download className="h-4 w-4 mr-2" />
+            JSON
+          </Button>
+        </div>
       </div>
 
       {viewMode === 'trends' ? (
