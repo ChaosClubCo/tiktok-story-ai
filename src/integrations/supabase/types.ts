@@ -80,6 +80,86 @@ export type Database = {
         }
         Relationships: []
       }
+      predictions_history: {
+        Row: {
+          conflict_clarity: number
+          content: string
+          created_at: string
+          dialogue_quality: number
+          emotional_impact: number
+          engagement_score: number
+          hook_strength: number
+          id: string
+          niche: string | null
+          pacing_quality: number
+          prediction_type: string
+          quotability: number
+          recommendations: Json | null
+          relatability: number
+          script_id: string | null
+          shareability_score: number
+          strengths: Json | null
+          title: string
+          user_id: string
+          viral_score: number
+          weaknesses: Json | null
+        }
+        Insert: {
+          conflict_clarity: number
+          content: string
+          created_at?: string
+          dialogue_quality: number
+          emotional_impact: number
+          engagement_score: number
+          hook_strength: number
+          id?: string
+          niche?: string | null
+          pacing_quality: number
+          prediction_type: string
+          quotability: number
+          recommendations?: Json | null
+          relatability: number
+          script_id?: string | null
+          shareability_score: number
+          strengths?: Json | null
+          title: string
+          user_id: string
+          viral_score: number
+          weaknesses?: Json | null
+        }
+        Update: {
+          conflict_clarity?: number
+          content?: string
+          created_at?: string
+          dialogue_quality?: number
+          emotional_impact?: number
+          engagement_score?: number
+          hook_strength?: number
+          id?: string
+          niche?: string | null
+          pacing_quality?: number
+          prediction_type?: string
+          quotability?: number
+          recommendations?: Json | null
+          relatability?: number
+          script_id?: string | null
+          shareability_score?: number
+          strengths?: Json | null
+          title?: string
+          user_id?: string
+          viral_score?: number
+          weaknesses?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_predictions_history_script"
+            columns: ["script_id"]
+            isOneToOne: false
+            referencedRelation: "scripts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           created_at: string

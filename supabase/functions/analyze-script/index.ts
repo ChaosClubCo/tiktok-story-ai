@@ -202,6 +202,42 @@ Provide a detailed analysis with scores and recommendations.`;
 
     console.log('Analysis complete:', { viral_score, engagement_score, shareability_score });
 
+    // Save prediction to history
+    try {
+      const { error: historyError } = await supabase
+        .from('predictions_history')
+        .insert({
+          user_id: user.id,
+          script_id: scriptId || null,
+          prediction_type: scriptId ? 'full_script' : 'premise',
+          title: title || 'Untitled',
+          content: content,
+          niche: niche || null,
+          viral_score,
+          engagement_score,
+          shareability_score,
+          hook_strength: analysis.hook_strength,
+          emotional_impact: analysis.emotional_impact,
+          conflict_clarity: analysis.conflict_clarity,
+          pacing_quality: analysis.pacing_quality,
+          dialogue_quality: analysis.dialogue_quality,
+          quotability: analysis.quotability,
+          relatability: analysis.relatability,
+          recommendations: analysis.recommendations,
+          strengths: analysis.strengths,
+          weaknesses: analysis.weaknesses
+        });
+
+      if (historyError) {
+        console.error('Failed to save prediction history:', historyError);
+        // Don't fail the request if history save fails
+      } else {
+        console.log('Prediction saved to history');
+      }
+    } catch (historyErr) {
+      console.error('Error saving prediction history:', historyErr);
+    }
+
     return new Response(
       JSON.stringify({ success: true, analysis: result }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
