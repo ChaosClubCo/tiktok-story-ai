@@ -14,10 +14,12 @@ import {
   Sparkles,
   Trash2,
   ChevronRight,
-  Lightbulb
+  Lightbulb,
+  LineChart as LineChartIcon
 } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 interface PredictionRecord {
   id: string;
@@ -48,6 +50,7 @@ export const PredictionHistory = () => {
   const [filter, setFilter] = useState<'all' | 'premise' | 'full_script'>('all');
   const [comparisonMode, setComparisonMode] = useState(false);
   const [comparisonPredictions, setComparisonPredictions] = useState<[PredictionRecord | null, PredictionRecord | null]>([null, null]);
+  const [viewMode, setViewMode] = useState<'list' | 'trends'>('list');
 
   useEffect(() => {
     fetchPredictions();
@@ -140,6 +143,20 @@ export const PredictionHistory = () => {
     };
   };
 
+  const getChartData = () => {
+    const filtered = filteredPredictions
+      .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+    
+    return filtered.map((prediction) => ({
+      date: format(new Date(prediction.created_at), 'MMM d'),
+      fullDate: format(new Date(prediction.created_at), 'MMM d, yyyy h:mm a'),
+      viralScore: prediction.viral_score,
+      engagement: prediction.engagement_score,
+      shareability: prediction.shareability_score,
+      title: prediction.title
+    }));
+  };
+
   if (loading) {
     return (
       <Card className="bg-card-elevated border-border/50">
@@ -166,32 +183,178 @@ export const PredictionHistory = () => {
   }
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      {/* History List */}
-      <Card className="lg:col-span-1 bg-card-elevated border-border/50">
-        <CardHeader>
-          <div className="flex items-center justify-between mb-2">
+    <div className="space-y-6">
+      {/* View Mode Tabs */}
+      <div className="flex gap-2">
+        <Button
+          variant={viewMode === 'list' ? 'default' : 'outline'}
+          size="sm"
+          onClick={() => setViewMode('list')}
+          className="gap-2"
+        >
+          <Clock className="w-4 h-4" />
+          History List
+        </Button>
+        <Button
+          variant={viewMode === 'trends' ? 'default' : 'outline'}
+          size="sm"
+          onClick={() => setViewMode('trends')}
+          className="gap-2"
+        >
+          <LineChartIcon className="w-4 h-4" />
+          Trends
+        </Button>
+      </div>
+
+      {viewMode === 'trends' ? (
+        /* Trends Chart View */
+        <Card className="bg-card-elevated border-border/50">
+          <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Clock className="w-5 h-5 text-primary" />
-              History
+              <LineChartIcon className="w-5 h-5 text-primary" />
+              Score Progress Over Time
             </CardTitle>
-            <Button
-              variant={comparisonMode ? "default" : "outline"}
-              size="sm"
-              onClick={() => {
-                setComparisonMode(!comparisonMode);
-                setComparisonPredictions([null, null]);
-                if (!comparisonMode) setSelectedPrediction(null);
-              }}
-            >
-              Compare
-            </Button>
-          </div>
-          <CardDescription>
-            {predictions.length} prediction{predictions.length !== 1 ? 's' : ''} tracked
-            {comparisonMode && " • Select 2 to compare"}
-          </CardDescription>
-        </CardHeader>
+            <CardDescription>
+              Track your improvement trajectory across {filteredPredictions.length} predictions
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Tabs defaultValue="all" className="mb-4">
+              <TabsList className="grid grid-cols-3 w-full">
+                <TabsTrigger value="all" onClick={() => setFilter('all')}>All</TabsTrigger>
+                <TabsTrigger value="premise" onClick={() => setFilter('premise')}>Premise</TabsTrigger>
+                <TabsTrigger value="full_script" onClick={() => setFilter('full_script')}>Full Script</TabsTrigger>
+              </TabsList>
+            </Tabs>
+
+            {getChartData().length > 0 ? (
+              <div className="space-y-6">
+                <ResponsiveContainer width="100%" height={400}>
+                  <LineChart data={getChartData()} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-border/30" />
+                    <XAxis 
+                      dataKey="date" 
+                      className="text-xs"
+                      stroke="hsl(var(--muted-foreground))"
+                    />
+                    <YAxis 
+                      domain={[0, 100]}
+                      className="text-xs"
+                      stroke="hsl(var(--muted-foreground))"
+                    />
+                    <Tooltip 
+                      contentStyle={{
+                        backgroundColor: 'hsl(var(--card))',
+                        border: '1px solid hsl(var(--border))',
+                        borderRadius: '8px',
+                        color: 'hsl(var(--foreground))'
+                      }}
+                      labelFormatter={(label, payload) => {
+                        if (payload && payload[0]) {
+                          return payload[0].payload.fullDate;
+                        }
+                        return label;
+                      }}
+                      formatter={(value: number, name: string) => {
+                        const nameMap: Record<string, string> = {
+                          viralScore: 'Viral Score',
+                          engagement: 'Engagement',
+                          shareability: 'Shareability'
+                        };
+                        return [value, nameMap[name] || name];
+                      }}
+                    />
+                    <Legend 
+                      wrapperStyle={{ color: 'hsl(var(--foreground))' }}
+                      formatter={(value) => {
+                        const nameMap: Record<string, string> = {
+                          viralScore: 'Viral Score',
+                          engagement: 'Engagement',
+                          shareability: 'Shareability'
+                        };
+                        return nameMap[value] || value;
+                      }}
+                    />
+                    <Line 
+                      type="monotone" 
+                      dataKey="viralScore" 
+                      stroke="hsl(var(--primary))" 
+                      strokeWidth={3}
+                      dot={{ fill: 'hsl(var(--primary))', r: 5 }}
+                      activeDot={{ r: 7 }}
+                    />
+                    <Line 
+                      type="monotone" 
+                      dataKey="engagement" 
+                      stroke="hsl(var(--chart-2))" 
+                      strokeWidth={2}
+                      dot={{ fill: 'hsl(var(--chart-2))', r: 4 }}
+                    />
+                    <Line 
+                      type="monotone" 
+                      dataKey="shareability" 
+                      stroke="hsl(var(--chart-3))" 
+                      strokeWidth={2}
+                      dot={{ fill: 'hsl(var(--chart-3))', r: 4 }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+
+                {/* Stats Summary */}
+                <div className="grid grid-cols-3 gap-4 pt-4 border-t border-border/50">
+                  {[
+                    { label: 'Average Viral Score', value: Math.round(filteredPredictions.reduce((sum, p) => sum + p.viral_score, 0) / filteredPredictions.length), color: 'text-primary' },
+                    { label: 'Highest Score', value: Math.max(...filteredPredictions.map(p => p.viral_score)), color: 'text-success' },
+                    { label: 'Total Predictions', value: filteredPredictions.length, color: 'text-muted-foreground' }
+                  ].map((stat) => (
+                    <div key={stat.label} className="text-center">
+                      <p className="text-2xl font-bold mb-1" style={{ color: `hsl(var(--${stat.color.replace('text-', '')}))` }}>
+                        {stat.value}
+                      </p>
+                      <p className="text-xs text-muted-foreground">{stat.label}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="p-12 text-center">
+                <LineChartIcon className="w-12 h-12 text-muted-foreground/50 mx-auto mb-4" />
+                <h3 className="text-lg font-semibold text-foreground mb-2">No Data to Display</h3>
+                <p className="text-sm text-muted-foreground">
+                  Create more predictions to see your progress over time
+                </p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      ) : (
+        /* Original List View */
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* History List */}
+          <Card className="lg:col-span-1 bg-card-elevated border-border/50">
+            <CardHeader>
+              <div className="flex items-center justify-between mb-2">
+                <CardTitle className="flex items-center gap-2">
+                  <Clock className="w-5 h-5 text-primary" />
+                  History
+                </CardTitle>
+                <Button
+                  variant={comparisonMode ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => {
+                    setComparisonMode(!comparisonMode);
+                    setComparisonPredictions([null, null]);
+                    if (!comparisonMode) setSelectedPrediction(null);
+                  }}
+                >
+                  Compare
+                </Button>
+              </div>
+              <CardDescription>
+                {predictions.length} prediction{predictions.length !== 1 ? 's' : ''} tracked
+                {comparisonMode && " • Select 2 to compare"}
+              </CardDescription>
+            </CardHeader>
         <CardContent>
           <Tabs value={filter} onValueChange={(v) => setFilter(v as any)} className="mb-4">
             <TabsList className="grid grid-cols-3 w-full">
@@ -504,6 +667,8 @@ export const PredictionHistory = () => {
           </CardContent>
         )}
       </Card>
+        </div>
+      )}
     </div>
   );
 };
