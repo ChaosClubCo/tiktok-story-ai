@@ -33,8 +33,8 @@ export const RemixSeriesModal = ({ series, isOpen, onClose }: RemixSeriesModalPr
 
     onClose();
     
-    // Navigate to series generation page with query param
-    navigate(`/series?remix=${series.id}`);
+    // Navigate to series builder flow with query param
+    navigate(`/series/builder?remix=${series.id}`);
   };
 
   return (
