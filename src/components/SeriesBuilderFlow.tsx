@@ -62,6 +62,8 @@ export const SeriesBuilderFlow = () => {
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
   const [remixTemplate, setRemixTemplate] = useState<SeriesTemplate | null>(null);
   const [selectedTrendId, setSelectedTrendId] = useState<string | null>(null);
+  const [isPredicting, setIsPredicting] = useState(false);
+  const [premisePrediction, setPremisePrediction] = useState<any>(null);
   
   const [formData, setFormData] = useState({
     title: '',
@@ -173,6 +175,50 @@ export const SeriesBuilderFlow = () => {
     setFormData(prev => ({ ...prev, title: topic }));
     analytics.track('trend_applied', { trendId, topic });
     toast.success(`🔥 Trend applied: "${topic}"`);
+  };
+
+  const handlePredictPremise = async () => {
+    if (!formData.title || !formData.logline) {
+      toast.error("Please enter both title and logline to predict");
+      return;
+    }
+
+    setIsPredicting(true);
+    setPremisePrediction(null);
+
+    try {
+      const { data, error } = await supabase.functions.invoke('analyze-script', {
+        body: {
+          content: formData.logline,
+          title: formData.title,
+          niche: formData.niche
+        }
+      });
+
+      if (error) throw error;
+
+      if (data.success && data.analysis) {
+        setPremisePrediction(data.analysis);
+        toast.success("Premise analyzed! Check the viral potential below.");
+        analytics.track('premise_predicted', {
+          viral_score: data.analysis.viral_score,
+          title: formData.title
+        });
+      } else {
+        throw new Error(data.error || 'Analysis failed');
+      }
+    } catch (error: any) {
+      console.error('Prediction error:', error);
+      if (error.message?.includes('Rate limit')) {
+        toast.error("AI rate limit exceeded. Please try again in a moment.");
+      } else if (error.message?.includes('credits')) {
+        toast.error("AI credits exhausted. Please add credits to continue.");
+      } else {
+        toast.error("Failed to predict premise. Please try again.");
+      }
+    } finally {
+      setIsPredicting(false);
+    }
   };
 
   const handleNext = () => {
@@ -292,7 +338,10 @@ export const SeriesBuilderFlow = () => {
                 id="logline"
                 placeholder="e.g., A series exposing the wildest red flags from real dating disasters"
                 value={formData.logline}
-                onChange={(e) => setFormData(prev => ({ ...prev, logline: e.target.value }))}
+                onChange={(e) => {
+                  setFormData(prev => ({ ...prev, logline: e.target.value }));
+                  setPremisePrediction(null); // Clear prediction when logline changes
+                }}
                 className="min-h-[120px] text-base bg-background/50 border-border/50 focus:border-primary resize-none"
                 autoFocus
               />
@@ -306,6 +355,86 @@ export const SeriesBuilderFlow = () => {
               <p className="text-sm text-muted-foreground">
                 [Main Character/Situation] + [Faces/Discovers] + [Compelling Hook/Twist]
               </p>
+            </div>
+
+            {/* Predict Before Generate Feature */}
+            <div className="mt-6 pt-6 border-t border-border/50">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h4 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                    <TrendingUp className="w-4 h-4 text-primary" />
+                    Predict Viral Potential
+                  </h4>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Validate your idea before generating full episodes
+                  </p>
+                </div>
+                <Button
+                  onClick={handlePredictPremise}
+                  disabled={isPredicting || !formData.title || !formData.logline}
+                  variant="outline"
+                  size="sm"
+                  className="gap-2"
+                >
+                  {isPredicting ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Analyzing...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-4 h-4" />
+                      Predict This Idea
+                    </>
+                  )}
+                </Button>
+              </div>
+
+              {premisePrediction && (
+                <div className="bg-primary/5 border border-primary/20 rounded-lg p-4 space-y-3 animate-in fade-in duration-300">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-foreground">Viral Score</span>
+                    <span className="text-2xl font-bold text-primary">
+                      {premisePrediction.viral_score}/100
+                    </span>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-muted-foreground">Engagement</span>
+                        <span className="font-medium text-foreground">{premisePrediction.engagement_score}/100</span>
+                      </div>
+                      <Progress value={premisePrediction.engagement_score} className="h-1.5" />
+                    </div>
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-muted-foreground">Shareability</span>
+                        <span className="font-medium text-foreground">{premisePrediction.shareability_score}/100</span>
+                      </div>
+                      <Progress value={premisePrediction.shareability_score} className="h-1.5" />
+                    </div>
+                  </div>
+
+                  {premisePrediction.recommendations && premisePrediction.recommendations.length > 0 && (
+                    <div className="mt-3 pt-3 border-t border-border/50">
+                      <p className="text-xs font-medium text-foreground mb-2">💡 Top Recommendation:</p>
+                      <p className="text-xs text-muted-foreground leading-relaxed">
+                        {premisePrediction.recommendations[0]}
+                      </p>
+                    </div>
+                  )}
+
+                  <Button
+                    onClick={() => navigate('/predictions')}
+                    variant="link"
+                    size="sm"
+                    className="text-xs h-auto p-0 text-primary"
+                  >
+                    View Full Analysis →
+                  </Button>
+                </div>
+              )}
             </div>
 
             {/* AI Suggestions */}
