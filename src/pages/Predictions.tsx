@@ -1,15 +1,34 @@
 import { useState, useEffect } from "react";
-import { useAuth } from "@/hooks/useAuth";
 import { Header } from "@/components/Header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { TrendingUp, Eye, Heart, Share2, Zap, Target, BarChart3, Sparkles, AlertCircle, Loader2, CheckCircle2, XCircle } from "lucide-react";
+import { 
+  Target, 
+  TrendingUp, 
+  Users, 
+  Share2, 
+  Sparkles,
+  ArrowRight,
+  Lightbulb,
+  CheckCircle2,
+  AlertCircle,
+  Loader2,
+  History,
+  BarChart3,
+  XCircle,
+  Eye,
+  Heart,
+  Zap
+} from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
+import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
+import { PredictionHistory } from "@/components/PredictionHistory";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface Script {
   id: string;
@@ -162,55 +181,68 @@ const Predictions = () => {
           </p>
         </div>
 
-        <Card className="mb-8 shadow-elevated">
-          <CardHeader>
-            <CardTitle>Select Script to Analyze</CardTitle>
-            <CardDescription>Choose from your saved scripts to get viral predictions</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {scripts.length === 0 ? (
-              <div className="text-center py-8">
-                <AlertCircle className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                <p className="text-muted-foreground mb-4">No scripts found. Create one first!</p>
-                <Button onClick={() => window.location.href = '/dashboard'}>
-                  Go to Dashboard
-                </Button>
-              </div>
-            ) : (
-              <div className="flex gap-4">
-                <Select value={selectedScriptId} onValueChange={setSelectedScriptId}>
-                  <SelectTrigger className="flex-1">
-                    <SelectValue placeholder="Select a script" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {scripts.map((script) => (
-                      <SelectItem key={script.id} value={script.id}>
-                        {script.title} ({script.niche})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Button 
-                  onClick={analyzeScript}
-                  disabled={analyzing || !selectedScriptId}
-                  className="gap-2"
-                >
-                  {analyzing ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      Analyzing...
-                    </>
-                  ) : (
-                    <>
-                      <BarChart3 className="w-4 h-4" />
-                      Analyze Script
-                    </>
-                  )}
-                </Button>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        <Tabs defaultValue="analyze" className="w-full">
+          <TabsList className="grid w-full max-w-md mx-auto grid-cols-2 mb-8">
+            <TabsTrigger value="analyze" className="gap-2">
+              <BarChart3 className="w-4 h-4" />
+              Analyze Script
+            </TabsTrigger>
+            <TabsTrigger value="history" className="gap-2">
+              <History className="w-4 h-4" />
+              Prediction History
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="analyze" className="space-y-8">
+            <Card className="shadow-elevated">
+              <CardHeader>
+                <CardTitle>Select Script to Analyze</CardTitle>
+                <CardDescription>Choose from your saved scripts to get viral predictions</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {scripts.length === 0 ? (
+                  <div className="text-center py-8">
+                    <AlertCircle className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                    <p className="text-muted-foreground mb-4">No scripts found. Create one first!</p>
+                    <Button onClick={() => window.location.href = '/dashboard'}>
+                      Go to Dashboard
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="flex gap-4">
+                    <Select value={selectedScriptId} onValueChange={setSelectedScriptId}>
+                      <SelectTrigger className="flex-1">
+                        <SelectValue placeholder="Select a script" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {scripts.map((script) => (
+                          <SelectItem key={script.id} value={script.id}>
+                            {script.title} ({script.niche})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Button 
+                      onClick={analyzeScript}
+                      disabled={analyzing || !selectedScriptId}
+                      className="gap-2"
+                    >
+                      {analyzing ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          Analyzing...
+                        </>
+                      ) : (
+                        <>
+                          <BarChart3 className="w-4 h-4" />
+                          Analyze Script
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
 
         {analysis && (
           <>
@@ -329,15 +361,21 @@ const Predictions = () => {
           </>
         )}
 
-        {!analysis && !analyzing && scripts.length > 0 && (
-          <Card className="text-center py-16">
-            <CardContent>
-              <BarChart3 className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
-              <h3 className="text-xl font-semibold mb-2">Ready to Analyze</h3>
-              <p className="text-muted-foreground mb-6">Select a script above and click "Analyze Script" to get AI-powered viral predictions</p>
-            </CardContent>
-          </Card>
-        )}
+            {!analysis && !analyzing && scripts.length > 0 && (
+              <Card className="text-center py-16">
+                <CardContent>
+                  <BarChart3 className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
+                  <h3 className="text-xl font-semibold mb-2">Ready to Analyze</h3>
+                  <p className="text-muted-foreground mb-6">Select a script above and click "Analyze Script" to get AI-powered viral predictions</p>
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
+
+          <TabsContent value="history">
+            <PredictionHistory />
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );
