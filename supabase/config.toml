@@ -16,6 +16,9 @@ verify_jwt = true
 [functions.customer-portal]
 verify_jwt = true
 
+[functions.demo-viral-score]
+verify_jwt = false
+
 [functions.send-registration-email]
 verify_jwt = true
 

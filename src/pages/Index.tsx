@@ -17,6 +17,7 @@ import { useSpecialEffects } from "@/hooks/useSpecialEffects";
 import { CinematicHeroBackground } from "@/components/CinematicHeroBackground";
 import { DifferentiationTable } from "@/components/DifferentiationTable";
 import { LiveSocialProofFeed } from "@/components/LiveSocialProofFeed";
+import { LandingViralPredictorCard } from "@/components/LandingViralPredictorCard";
 import { Sparkles, TrendingUp, Zap } from "lucide-react";
 
 // Mock script generation - in real app, this would call an AI API
@@ -294,6 +295,13 @@ const Index = () => {
           <p className="text-sm text-muted-foreground pt-8">
             30,000+ creators generated 1M+ scripts this month
           </p>
+        </div>
+      </section>
+
+      {/* Viral Predictor Demo Widget */}
+      <section className="container mx-auto px-4 py-16">
+        <div className="max-w-2xl mx-auto">
+          <LandingViralPredictorCard />
         </div>
       </section>
 
