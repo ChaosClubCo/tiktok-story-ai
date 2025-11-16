@@ -21,7 +21,8 @@ import {
   Download,
   FileDown,
   CalendarIcon,
-  X
+  X,
+  Loader2
 } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
@@ -57,11 +58,14 @@ export const PredictionHistory = () => {
   const [filter, setFilter] = useState<'all' | 'premise' | 'full_script'>('all');
   const [comparisonMode, setComparisonMode] = useState(false);
   const [comparisonPredictions, setComparisonPredictions] = useState<[PredictionRecord | null, PredictionRecord | null]>([null, null]);
-  const [viewMode, setViewMode] = useState<'list' | 'trends'>('list');
+  const [viewMode, setViewMode] = useState<'list' | 'trends' | 'insights'>('list');
   const [dateRange, setDateRange] = useState<{ from: Date | undefined; to: Date | undefined }>({
     from: undefined,
     to: undefined
   });
+  const [insights, setInsights] = useState<any>(null);
+  const [insightsLoading, setInsightsLoading] = useState(false);
+  const [insightsCacheTime, setInsightsCacheTime] = useState<number | null>(null);
 
   useEffect(() => {
     fetchPredictions();
@@ -226,6 +230,45 @@ export const PredictionHistory = () => {
     toast.success(`${filteredPredictions.length} predictions exported to CSV`);
   };
 
+  const generateInsights = async () => {
+    // Check cache (24 hours)
+    const now = Date.now();
+    if (insightsCacheTime && (now - insightsCacheTime < 24 * 60 * 60 * 1000) && insights) {
+      toast.info("Using cached insights. Refresh after 24 hours for new insights.");
+      return;
+    }
+
+    setInsightsLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-trend-insights');
+
+      if (error) throw error;
+      
+      setInsights(data.insights);
+      setInsightsCacheTime(now);
+      localStorage.setItem('insights_cache', JSON.stringify({ insights: data.insights, time: now }));
+      toast.success("Insights generated successfully");
+    } catch (error: any) {
+      console.error('Error generating insights:', error);
+      toast.error(error.message || "Failed to generate insights");
+    } finally {
+      setInsightsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    // Load cached insights on mount
+    const cached = localStorage.getItem('insights_cache');
+    if (cached) {
+      const { insights: cachedInsights, time } = JSON.parse(cached);
+      const now = Date.now();
+      if (now - time < 24 * 60 * 60 * 1000) {
+        setInsights(cachedInsights);
+        setInsightsCacheTime(time);
+      }
+    }
+  }, []);
+
   const exportToJSON = () => {
     const exportData = {
       exportDate: new Date().toISOString(),
@@ -325,6 +368,15 @@ export const PredictionHistory = () => {
           >
             <LineChartIcon className="w-4 h-4" />
             Trends
+          </Button>
+          <Button
+            variant={viewMode === 'insights' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setViewMode('insights')}
+            className="gap-2"
+          >
+            <Sparkles className="w-4 h-4" />
+            AI Insights
           </Button>
         </div>
 
@@ -515,6 +567,28 @@ export const PredictionHistory = () => {
             )}
           </CardContent>
         </Card>
+      ) : viewMode === 'insights' ? (
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-lg font-semibold">AI-Powered Insights</h3>
+              <p className="text-sm text-muted-foreground">Get personalized recommendations based on your prediction history</p>
+            </div>
+            <Button onClick={generateInsights} disabled={insightsLoading || predictions.length < 3}>
+              {insightsLoading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Analyzing...</> : <><Sparkles className="w-4 h-4 mr-2" />{insights ? 'Refresh Insights' : 'Generate Insights'}</>}
+            </Button>
+          </div>
+          {predictions.length < 3 && <Card><CardContent className="pt-6 text-center"><Lightbulb className="w-12 h-12 mx-auto mb-4 text-muted-foreground opacity-50" /><p className="text-muted-foreground">You need at least 3 predictions to generate AI insights.</p></CardContent></Card>}
+          {insights && (
+            <div className="grid gap-4 md:grid-cols-2">
+              <Card><CardHeader><CardTitle className="flex items-center gap-2"><TrendingUp className="w-5 h-5 text-primary" />Performance Summary</CardTitle></CardHeader><CardContent><p className="text-sm">{insights.performanceSummary}</p></CardContent></Card>
+              <Card><CardHeader><CardTitle className="flex items-center gap-2"><Sparkles className="w-5 h-5 text-success" />What's Working</CardTitle></CardHeader><CardContent><ul className="space-y-2">{insights.bestPractices.map((practice: string, idx: number) => (<li key={idx} className="flex items-start gap-2 text-sm"><span className="text-success mt-0.5">✓</span><span>{practice}</span></li>))}</ul></CardContent></Card>
+              <Card><CardHeader><CardTitle className="flex items-center gap-2"><Target className="w-5 h-5 text-warning" />Areas to Improve</CardTitle></CardHeader><CardContent><ul className="space-y-2">{insights.improvementAreas.map((area: string, idx: number) => (<li key={idx} className="flex items-start gap-2 text-sm"><span className="text-warning mt-0.5">→</span><span>{area}</span></li>))}</ul></CardContent></Card>
+              <Card><CardHeader><CardTitle className="flex items-center gap-2"><Lightbulb className="w-5 h-5 text-primary" />Next Steps</CardTitle></CardHeader><CardContent><ul className="space-y-2">{insights.recommendations.map((rec: string, idx: number) => (<li key={idx} className="flex items-start gap-2 text-sm"><span className="text-primary mt-0.5">•</span><span>{rec}</span></li>))}</ul></CardContent></Card>
+            </div>
+          )}
+          {insightsCacheTime && insights && <p className="text-xs text-muted-foreground text-center">Insights generated {format(new Date(insightsCacheTime), 'MMM d, yyyy h:mm a')}</p>}
+        </div>
       ) : (
         /* Original List View */
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

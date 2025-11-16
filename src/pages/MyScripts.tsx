@@ -6,9 +6,11 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Trash2, Download, Eye, CheckSquare, Square, Loader2 } from "lucide-react";
+import { Trash2, Download, Eye, CheckSquare, Square, Loader2, History, Save } from "lucide-react";
 import { Header } from "@/components/Header";
+import { ScriptVersionHistory } from "@/components/ScriptVersionHistory";
 import { useNavigate } from "react-router-dom";
 
 interface SavedScript {
@@ -20,6 +22,7 @@ interface SavedScript {
   tone: string;
   topic: string;
   created_at: string;
+  current_version?: number;
 }
 
 interface BatchAnalysisResult {
@@ -39,6 +42,8 @@ const MyScripts = () => {
   const [batchAnalyzing, setBatchAnalyzing] = useState(false);
   const [batchProgress, setBatchProgress] = useState({ current: 0, total: 0 });
   const [batchResults, setBatchResults] = useState<BatchAnalysisResult[]>([]);
+  const [versionHistoryScript, setVersionHistoryScript] = useState<SavedScript | null>(null);
+  const [versionHistoryOpen, setVersionHistoryOpen] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -146,6 +151,44 @@ const MyScripts = () => {
       newSelection.add(scriptId);
     }
     setSelectedScriptIds(newSelection);
+  };
+
+  const handleCreateVersion = async (scriptId: string, description?: string) => {
+    try {
+      const { data, error } = await supabase.functions.invoke('create-script-version', {
+        body: { scriptId, changeDescription: description }
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Version Created",
+        description: `Version ${data.version.version_number} created successfully`,
+      });
+
+      fetchScripts(); // Refresh to show updated version number
+    } catch (error) {
+      console.error('Error creating version:', error);
+      toast({
+        title: "Error",
+        description: "Failed to create version",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleShowVersionHistory = (script: SavedScript) => {
+    setVersionHistoryScript(script);
+    setVersionHistoryOpen(true);
+  };
+
+  const handleVersionRestore = (version: any) => {
+    setVersionHistoryOpen(false);
+    fetchScripts();
+    toast({
+      title: "Version Restored",
+      description: "Script has been restored to selected version",
+    });
   };
 
   const toggleSelectAll = () => {
@@ -405,28 +448,25 @@ const MyScripts = () => {
                       </p>
                     </div>
                     
-                    <div className="flex gap-2">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleView(script)}
-                      >
-                        <Eye className="h-4 w-4" />
+                    <div className="flex flex-wrap gap-2">
+                      <Button variant="outline" size="sm" onClick={() => handleView(script)}>
+                        <Eye className="w-4 h-4 mr-2" />View
                       </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleExport(script)}
-                      >
-                        <Download className="h-4 w-4" />
+                      <Button variant="outline" size="sm" onClick={() => handleExport(script)}>
+                        <Download className="w-4 h-4 mr-2" />Export
                       </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleDelete(script.id)}
-                        className="text-destructive hover:text-destructive"
-                      >
-                        <Trash2 className="h-4 w-4" />
+                      <Button variant="secondary" size="sm" onClick={() => handleShowVersionHistory(script)}>
+                        <History className="w-4 h-4 mr-2" />
+                        History
+                        {script.current_version && script.current_version > 1 && (
+                          <Badge variant="outline" className="ml-2">v{script.current_version}</Badge>
+                        )}
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={() => handleCreateVersion(script.id, `Manual save`)}>
+                        <Save className="w-4 h-4 mr-2" />Save Version
+                      </Button>
+                      <Button variant="destructive" size="sm" onClick={() => handleDelete(script.id)}>
+                        <Trash2 className="w-4 h-4 mr-2" />Delete
                       </Button>
                     </div>
                   </div>
@@ -514,6 +554,21 @@ const MyScripts = () => {
           </div>
         )}
       </div>
+
+      <Dialog open={versionHistoryOpen} onOpenChange={setVersionHistoryOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh]">
+          <DialogHeader>
+            <DialogTitle>Version History - {versionHistoryScript?.title}</DialogTitle>
+          </DialogHeader>
+          {versionHistoryScript && (
+            <ScriptVersionHistory
+              scriptId={versionHistoryScript.id}
+              currentVersion={versionHistoryScript.current_version || 1}
+              onRestore={handleVersionRestore}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

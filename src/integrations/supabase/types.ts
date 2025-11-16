@@ -184,16 +184,84 @@ export type Database = {
         }
         Relationships: []
       }
+      script_versions: {
+        Row: {
+          change_description: string | null
+          content: string
+          created_at: string
+          id: string
+          length: string | null
+          niche: string | null
+          prediction_id: string | null
+          script_id: string
+          title: string
+          tone: string | null
+          topic: string | null
+          user_id: string
+          version_number: number
+          viral_score: number | null
+        }
+        Insert: {
+          change_description?: string | null
+          content: string
+          created_at?: string
+          id?: string
+          length?: string | null
+          niche?: string | null
+          prediction_id?: string | null
+          script_id: string
+          title: string
+          tone?: string | null
+          topic?: string | null
+          user_id: string
+          version_number: number
+          viral_score?: number | null
+        }
+        Update: {
+          change_description?: string | null
+          content?: string
+          created_at?: string
+          id?: string
+          length?: string | null
+          niche?: string | null
+          prediction_id?: string | null
+          script_id?: string
+          title?: string
+          tone?: string | null
+          topic?: string | null
+          user_id?: string
+          version_number?: number
+          viral_score?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "script_versions_prediction_id_fkey"
+            columns: ["prediction_id"]
+            isOneToOne: false
+            referencedRelation: "predictions_history"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "script_versions_script_id_fkey"
+            columns: ["script_id"]
+            isOneToOne: false
+            referencedRelation: "scripts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       scripts: {
         Row: {
           beat_markers: Json | null
           content: string
           content_safety_flags: Json | null
           created_at: string
+          current_version: number | null
           episode_number: number | null
           fiction_disclaimer: boolean | null
           hook_variations: Json | null
           id: string
+          last_version_at: string | null
           length: string
           niche: string
           script_mode: string | null
@@ -211,10 +279,12 @@ export type Database = {
           content: string
           content_safety_flags?: Json | null
           created_at?: string
+          current_version?: number | null
           episode_number?: number | null
           fiction_disclaimer?: boolean | null
           hook_variations?: Json | null
           id?: string
+          last_version_at?: string | null
           length: string
           niche: string
           script_mode?: string | null
@@ -232,10 +302,12 @@ export type Database = {
           content?: string
           content_safety_flags?: Json | null
           created_at?: string
+          current_version?: number | null
           episode_number?: number | null
           fiction_disclaimer?: boolean | null
           hook_variations?: Json | null
           id?: string
+          last_version_at?: string | null
           length?: string
           niche?: string
           script_mode?: string | null
