@@ -33,3 +33,6 @@ verify_jwt = true
 
 [functions.fetch-trends]
 verify_jwt = false
+
+[functions.analyze-script]
+verify_jwt = true
