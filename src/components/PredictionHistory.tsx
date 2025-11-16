@@ -46,6 +46,8 @@ export const PredictionHistory = () => {
   const [loading, setLoading] = useState(true);
   const [selectedPrediction, setSelectedPrediction] = useState<PredictionRecord | null>(null);
   const [filter, setFilter] = useState<'all' | 'premise' | 'full_script'>('all');
+  const [comparisonMode, setComparisonMode] = useState(false);
+  const [comparisonPredictions, setComparisonPredictions] = useState<[PredictionRecord | null, PredictionRecord | null]>([null, null]);
 
   useEffect(() => {
     fetchPredictions();
@@ -117,6 +119,27 @@ export const PredictionHistory = () => {
     return "bg-destructive/10 border-destructive/20";
   };
 
+  const handleComparisonSelect = (prediction: PredictionRecord) => {
+    if (comparisonPredictions[0] === null) {
+      setComparisonPredictions([prediction, null]);
+    } else if (comparisonPredictions[1] === null && comparisonPredictions[0].id !== prediction.id) {
+      setComparisonPredictions([comparisonPredictions[0], prediction]);
+    } else if (comparisonPredictions[0]?.id === prediction.id) {
+      setComparisonPredictions([comparisonPredictions[1], null]);
+    } else if (comparisonPredictions[1]?.id === prediction.id) {
+      setComparisonPredictions([comparisonPredictions[0], null]);
+    }
+  };
+
+  const getScoreDelta = (score1: number, score2: number) => {
+    const delta = score1 - score2;
+    return {
+      value: Math.abs(delta),
+      direction: delta > 0 ? 'up' : delta < 0 ? 'down' : 'neutral',
+      color: delta > 0 ? 'text-success' : delta < 0 ? 'text-destructive' : 'text-muted-foreground'
+    };
+  };
+
   if (loading) {
     return (
       <Card className="bg-card-elevated border-border/50">
@@ -147,12 +170,26 @@ export const PredictionHistory = () => {
       {/* History List */}
       <Card className="lg:col-span-1 bg-card-elevated border-border/50">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Clock className="w-5 h-5 text-primary" />
-            History
-          </CardTitle>
+          <div className="flex items-center justify-between mb-2">
+            <CardTitle className="flex items-center gap-2">
+              <Clock className="w-5 h-5 text-primary" />
+              History
+            </CardTitle>
+            <Button
+              variant={comparisonMode ? "default" : "outline"}
+              size="sm"
+              onClick={() => {
+                setComparisonMode(!comparisonMode);
+                setComparisonPredictions([null, null]);
+                if (!comparisonMode) setSelectedPrediction(null);
+              }}
+            >
+              Compare
+            </Button>
+          </div>
           <CardDescription>
             {predictions.length} prediction{predictions.length !== 1 ? 's' : ''} tracked
+            {comparisonMode && " • Select 2 to compare"}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -166,46 +203,164 @@ export const PredictionHistory = () => {
 
           <ScrollArea className="h-[500px] pr-4">
             <div className="space-y-2">
-              {filteredPredictions.map((prediction) => (
-                <button
-                  key={prediction.id}
-                  onClick={() => setSelectedPrediction(prediction)}
-                  className={`w-full text-left p-3 rounded-lg border transition-all hover:bg-background/50 ${
-                    selectedPrediction?.id === prediction.id
-                      ? 'border-primary bg-primary/5'
-                      : 'border-border/30'
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-2 mb-2">
-                    <div className="flex-1 min-w-0">
-                      <h4 className="font-medium text-sm text-foreground truncate">
-                        {prediction.title}
-                      </h4>
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        {format(new Date(prediction.created_at), 'MMM d, yyyy h:mm a')}
-                      </p>
+              {filteredPredictions.map((prediction) => {
+                const isInComparison = comparisonPredictions[0]?.id === prediction.id || comparisonPredictions[1]?.id === prediction.id;
+                const comparisonIndex = comparisonPredictions[0]?.id === prediction.id ? 1 : comparisonPredictions[1]?.id === prediction.id ? 2 : null;
+                
+                return (
+                  <button
+                    key={prediction.id}
+                    onClick={() => comparisonMode ? handleComparisonSelect(prediction) : setSelectedPrediction(prediction)}
+                    className={`w-full text-left p-3 rounded-lg border transition-all hover:bg-background/50 ${
+                      comparisonMode && isInComparison
+                        ? 'border-primary bg-primary/5'
+                        : !comparisonMode && selectedPrediction?.id === prediction.id
+                        ? 'border-primary bg-primary/5'
+                        : 'border-border/30'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-2 mb-2">
+                      <div className="flex-1 min-w-0">
+                        <h4 className="font-medium text-sm text-foreground truncate">
+                          {prediction.title}
+                        </h4>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          {format(new Date(prediction.created_at), 'MMM d, yyyy h:mm a')}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        {comparisonMode && comparisonIndex && (
+                          <Badge variant="default" className="text-xs">
+                            {comparisonIndex}
+                          </Badge>
+                        )}
+                        <Badge variant="outline" className="text-xs">
+                          {prediction.prediction_type === 'premise' ? 'Premise' : 'Full'}
+                        </Badge>
+                      </div>
                     </div>
-                    <Badge variant="outline" className="text-xs shrink-0">
-                      {prediction.prediction_type === 'premise' ? 'Premise' : 'Full'}
-                    </Badge>
-                  </div>
-                  
-                  <div className="flex items-center gap-2">
-                    <span className={`text-xl font-bold ${getScoreColor(prediction.viral_score)}`}>
-                      {prediction.viral_score}
-                    </span>
-                    <ChevronRight className="w-4 h-4 text-muted-foreground ml-auto" />
-                  </div>
-                </button>
-              ))}
+                    
+                    <div className="flex items-center gap-2">
+                      <span className={`text-xl font-bold ${getScoreColor(prediction.viral_score)}`}>
+                        {prediction.viral_score}
+                      </span>
+                      <ChevronRight className="w-4 h-4 text-muted-foreground ml-auto" />
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           </ScrollArea>
         </CardContent>
       </Card>
 
-      {/* Detailed View */}
+      {/* Detailed View or Comparison View */}
       <Card className="lg:col-span-2 bg-card-elevated border-border/50">
-        {selectedPrediction ? (
+        {comparisonMode && comparisonPredictions[0] && comparisonPredictions[1] ? (
+          <>
+            <CardHeader>
+              <CardTitle className="text-xl">Comparison View</CardTitle>
+              <CardDescription>Compare metrics between two predictions</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Headers */}
+              <div className="grid grid-cols-2 gap-4">
+                {comparisonPredictions.map((pred, idx) => (
+                  <div key={pred!.id} className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <Badge variant="default" className="text-xs">{idx + 1}</Badge>
+                      <h3 className="font-semibold text-sm text-foreground truncate">{pred!.title}</h3>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {format(new Date(pred!.created_at), 'MMM d, yyyy')}
+                    </p>
+                  </div>
+                ))}
+              </div>
+
+              {/* Main Scores Comparison */}
+              <div className="space-y-4">
+                <h4 className="text-sm font-semibold text-foreground">Main Scores</h4>
+                {[
+                  { label: 'Viral Score', key: 'viral_score' as keyof PredictionRecord },
+                  { label: 'Engagement', key: 'engagement_score' as keyof PredictionRecord },
+                  { label: 'Shareability', key: 'shareability_score' as keyof PredictionRecord }
+                ].map((metric) => {
+                  const score1 = comparisonPredictions[0]![metric.key] as number;
+                  const score2 = comparisonPredictions[1]![metric.key] as number;
+                  const delta = getScoreDelta(score1, score2);
+                  
+                  return (
+                    <div key={metric.key} className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-medium text-muted-foreground uppercase">{metric.label}</span>
+                        {delta.direction !== 'neutral' && (
+                          <span className={`text-xs flex items-center gap-1 ${delta.color}`}>
+                            {delta.direction === 'up' ? (
+                              <TrendingUp className="w-3 h-3" />
+                            ) : (
+                              <TrendingDown className="w-3 h-3" />
+                            )}
+                            {delta.value} points
+                          </span>
+                        )}
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className={`p-3 rounded-lg border ${getScoreBgColor(score1)}`}>
+                          <span className={`text-2xl font-bold ${getScoreColor(score1)}`}>{score1}</span>
+                        </div>
+                        <div className={`p-3 rounded-lg border ${getScoreBgColor(score2)}`}>
+                          <span className={`text-2xl font-bold ${getScoreColor(score2)}`}>{score2}</span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Detailed Metrics Comparison */}
+              <div className="space-y-3">
+                <h4 className="text-sm font-semibold text-foreground">Detailed Breakdown</h4>
+                {[
+                  { label: 'Hook Strength', key: 'hook_strength' as keyof PredictionRecord },
+                  { label: 'Emotional Impact', key: 'emotional_impact' as keyof PredictionRecord },
+                  { label: 'Conflict Clarity', key: 'conflict_clarity' as keyof PredictionRecord },
+                  { label: 'Pacing Quality', key: 'pacing_quality' as keyof PredictionRecord },
+                  { label: 'Dialogue Quality', key: 'dialogue_quality' as keyof PredictionRecord },
+                  { label: 'Quotability', key: 'quotability' as keyof PredictionRecord },
+                  { label: 'Relatability', key: 'relatability' as keyof PredictionRecord }
+                ].map((metric) => {
+                  const value1 = comparisonPredictions[0]![metric.key] as number;
+                  const value2 = comparisonPredictions[1]![metric.key] as number;
+                  const delta = getScoreDelta(value1, value2);
+                  
+                  return (
+                    <div key={metric.key} className="space-y-2">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-muted-foreground">{metric.label}</span>
+                        {delta.direction !== 'neutral' && (
+                          <span className={`flex items-center gap-1 ${delta.color}`}>
+                            {delta.direction === 'up' ? '+' : '-'}{delta.value}
+                          </span>
+                        )}
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-1">
+                          <span className="text-xs font-medium text-foreground">{value1}/100</span>
+                          <Progress value={value1} className="h-1.5" />
+                        </div>
+                        <div className="space-y-1">
+                          <span className="text-xs font-medium text-foreground">{value2}/100</span>
+                          <Progress value={value2} className="h-1.5" />
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </>
+        ) : selectedPrediction ? (
           <>
             <CardHeader>
               <div className="flex items-start justify-between">
@@ -337,9 +492,14 @@ export const PredictionHistory = () => {
         ) : (
           <CardContent className="p-12 text-center">
             <Target className="w-12 h-12 text-muted-foreground/50 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-foreground mb-2">Select a Prediction</h3>
+            <h3 className="text-lg font-semibold text-foreground mb-2">
+              {comparisonMode ? 'Select Two Predictions' : 'Select a Prediction'}
+            </h3>
             <p className="text-sm text-muted-foreground">
-              Choose a prediction from the history to view detailed analysis
+              {comparisonMode 
+                ? 'Choose two predictions from the history to compare side-by-side'
+                : 'Choose a prediction from the history to view detailed analysis'
+              }
             </p>
           </CardContent>
         )}
