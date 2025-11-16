@@ -14,7 +14,10 @@ import { TrendRadar } from "@/components/TrendRadar";
 import { HookVariations } from "@/components/HookVariations";
 import { Button } from "@/components/ui/button";
 import { useSpecialEffects } from "@/hooks/useSpecialEffects";
-import heroImage from "@/assets/hero-drama.jpg";
+import { CinematicHeroBackground } from "@/components/CinematicHeroBackground";
+import { DifferentiationTable } from "@/components/DifferentiationTable";
+import { LiveSocialProofFeed } from "@/components/LiveSocialProofFeed";
+import { Sparkles, TrendingUp, Zap } from "lucide-react";
 
 // Mock script generation - in real app, this would call an AI API
 const generateMockScript = (niche: string, length: string, tone: string, topic: string) => {
@@ -215,37 +218,105 @@ const Index = () => {
   // }
 
   return (
-    <div className="min-h-screen bg-gradient-hero">
+    <div className="min-h-screen bg-background-base">
       <Header />
-      {/* Hero Section */}
-      <div className="relative h-[60vh] flex items-center justify-center overflow-hidden">
-        <div className="absolute inset-0">
-          <img 
-            src={heroImage} 
-            alt="MiniDrama Hero" 
-            className="w-full h-full object-cover opacity-70"
-          />
-          <div className="absolute inset-0 bg-gradient-to-b from-background/20 via-background/60 to-background"></div>
-        </div>
+      
+      {/* Cinematic Hero Section */}
+      <section className="relative min-h-[90vh] flex items-center justify-center overflow-hidden">
+        <CinematicHeroBackground />
         
-        <div className="relative text-center space-y-6 px-4 max-w-4xl mx-auto">
-          <h1 className="text-5xl md:text-7xl font-bold bg-gradient-drama bg-clip-text text-transparent">
-            MiniDrama
-          </h1>
-          <p className="text-xl md:text-2xl text-muted-foreground max-w-2xl mx-auto">
-            Generate viral TikTok scripts with AI. Choose your drama niche, set the vibe, and create content that goes viral.
-          </p>
-          <div className="flex flex-wrap justify-center gap-4 text-sm text-muted-foreground">
-            <span>🎬 Scene-by-scene breakdown</span>
-            <span>🎵 Sound suggestions</span>
-            <span>📱 TikTok-optimized</span>
-            <span>✨ AI-powered</span>
+        <div className="relative z-10 text-center space-y-8 px-4 max-w-6xl mx-auto">
+          {/* Main Headline */}
+          <div className="space-y-4">
+            <h1 className="text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-bold leading-tight">
+              <span className="block bg-gradient-drama bg-clip-text text-transparent">
+                Stop Creating.
+              </span>
+              <span className="block text-foreground">
+                Start Building.
+              </span>
+            </h1>
+            <p className="text-lg sm:text-xl md:text-2xl text-muted-foreground max-w-3xl mx-auto leading-relaxed">
+              The only AI platform that turns viral ideas into{" "}
+              <span className="text-primary font-semibold">serialized content empires</span>
+            </p>
           </div>
+
+          {/* USP Cards */}
+          <div className="grid sm:grid-cols-3 gap-4 max-w-4xl mx-auto mt-12">
+            <div className="bg-card/50 backdrop-blur-sm border border-border/50 rounded-xl p-6 hover:bg-card/70 transition-all hover:shadow-glow group">
+              <Sparkles className="w-8 h-8 text-primary mx-auto mb-3 group-hover:scale-110 transition-transform" />
+              <h3 className="font-semibold text-foreground mb-2">Series Builder</h3>
+              <p className="text-sm text-muted-foreground">
+                Generate complete 5-10 episode series in one click
+              </p>
+            </div>
+            
+            <div className="bg-card/50 backdrop-blur-sm border border-border/50 rounded-xl p-6 hover:bg-card/70 transition-all hover:shadow-glow-secondary group">
+              <TrendingUp className="w-8 h-8 text-secondary mx-auto mb-3 group-hover:scale-110 transition-transform" />
+              <h3 className="font-semibold text-foreground mb-2">Viral Predictor</h3>
+              <p className="text-sm text-muted-foreground">
+                See your content's viral potential before posting
+              </p>
+            </div>
+            
+            <div className="bg-card/50 backdrop-blur-sm border border-border/50 rounded-xl p-6 hover:bg-card/70 transition-all hover:shadow-glow group">
+              <Zap className="w-8 h-8 text-info mx-auto mb-3 group-hover:scale-110 transition-transform" />
+              <h3 className="font-semibold text-foreground mb-2">Team Studio</h3>
+              <p className="text-sm text-muted-foreground">
+                Built for creator teams, not just solopreneurs
+              </p>
+            </div>
+          </div>
+
+          {/* CTA Buttons */}
+          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mt-8">
+            <Button 
+              size="lg" 
+              className="text-lg px-8 py-6 shadow-glow hover:shadow-glow hover:scale-105 transition-all"
+              onClick={() => {
+                document.getElementById('niche-selector')?.scrollIntoView({ behavior: 'smooth' });
+              }}
+            >
+              Generate Your First Series
+            </Button>
+            <Button 
+              size="lg" 
+              variant="outline" 
+              className="text-lg px-8 py-6 hover:bg-card hover:scale-105 transition-all"
+              onClick={() => navigate("/series")}
+            >
+              See How It Works
+            </Button>
+          </div>
+
+          {/* Social Proof */}
+          <p className="text-sm text-muted-foreground pt-8">
+            30,000+ creators generated 1M+ scripts this month
+          </p>
         </div>
-      </div>
+      </section>
+
+      {/* Live Social Proof Feed */}
+      <LiveSocialProofFeed />
+
+      {/* Differentiation Table */}
+      <DifferentiationTable />
 
       {/* Main Content */}
-      <div className="container mx-auto px-4 py-8 space-y-8">
+      <div id="niche-selector" className="container mx-auto px-4 py-16 space-y-16">
+        {/* Section Header */}
+        <div className="text-center space-y-4 max-w-3xl mx-auto">
+          <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold">
+            <span className="bg-gradient-drama bg-clip-text text-transparent">
+              Build Your Drama Empire
+            </span>
+          </h2>
+          <p className="text-lg text-muted-foreground">
+            Generate multi-episode series designed to keep audiences hooked and algorithms happy
+          </p>
+        </div>
+
         {/* Niche Selection */}
         <NicheSelector 
           selectedNiche={selectedNiche}
