@@ -13,6 +13,7 @@ import { Progress } from "@/components/ui/progress";
 import { TrendingUp, FileText, Target, Calendar, ArrowUpRight, ArrowDownRight } from "lucide-react";
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { format, subDays } from 'date-fns';
+import { sanitizeText } from '@/lib/sanitization';
 
 interface Script {
   id: string;
@@ -260,7 +261,7 @@ const Analytics = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Best Script</p>
-                  <p className="text-lg font-bold truncate">{bestScript?.title || 'N/A'}</p>
+                  <p className="text-lg font-bold truncate">{sanitizeText(bestScript?.title) || 'N/A'}</p>
                 </div>
                 <Target className="h-8 w-8 text-accent" />
               </div>
@@ -392,9 +393,9 @@ const Analytics = () => {
                   <TableBody>
                     {topScripts.map((script) => (
                       <TableRow key={script.id}>
-                        <TableCell className="font-medium">{script.title}</TableCell>
+                        <TableCell className="font-medium">{sanitizeText(script.title)}</TableCell>
                         <TableCell>
-                          <Badge variant="secondary">{script.niche}</Badge>
+                          <Badge variant="secondary">{sanitizeText(script.niche)}</Badge>
                         </TableCell>
                         <TableCell>
                           <Badge variant={script.viral_score >= 80 ? 'default' : 'secondary'}>
@@ -423,7 +424,7 @@ const Analytics = () => {
                   {nichePerformance.map((niche) => (
                     <div key={niche.niche} className="space-y-2">
                       <div className="flex justify-between text-sm">
-                        <span className="font-medium">{niche.niche}</span>
+                        <span className="font-medium">{sanitizeText(niche.niche)}</span>
                         <span className="text-muted-foreground">{niche.avgScore}/100</span>
                       </div>
                       <Progress value={niche.avgScore} className="h-2" />

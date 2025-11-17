@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { checkRateLimit } from "../_shared/rateLimit.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -11,17 +12,55 @@ serve(async (req) => {
   }
 
   try {
-    const { idea } = await req.json();
+    // Rate limiting check (10 requests per minute per IP)
+    const clientIp = req.headers.get('x-forwarded-for') || 
+                     req.headers.get('cf-connecting-ip') || 
+                     'unknown';
+    
+    const rateLimitResult = checkRateLimit({
+      identifier: `demo-viral-${clientIp}`,
+      maxRequests: 10,
+      windowMs: 60 * 1000 // 1 minute
+    });
 
-    if (!idea || typeof idea !== 'string' || idea.trim().length < 10) {
+    if (!rateLimitResult.allowed) {
+      console.warn(`Rate limit exceeded for IP: ${clientIp}`);
       return new Response(
-        JSON.stringify({ error: 'Please provide a script idea with at least 10 characters' }),
+        JSON.stringify({ 
+          error: 'Rate limit exceeded. Please try again later.',
+          retryAfter: rateLimitResult.retryAfter 
+        }),
+        { 
+          status: 429,
+          headers: { 
+            ...corsHeaders, 
+            'Content-Type': 'application/json',
+            'Retry-After': String(rateLimitResult.retryAfter || 60)
+          } 
+        }
+      );
+    }
+
+    const { idea } = await req.json();
+    
+    // Enhanced input validation
+    if (!idea || typeof idea !== 'string') {
+      return new Response(
+        JSON.stringify({ error: 'Invalid input: idea must be a string' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const trimmedIdea = idea.trim();
+    if (trimmedIdea.length < 10 || trimmedIdea.length > 1000) {
+      return new Response(
+        JSON.stringify({ error: 'Idea must be between 10 and 1000 characters' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
     // Pseudo-random scoring based on string hash for consistent results
-    const hash = idea.split('').reduce((acc, char) => {
+    const hash = trimmedIdea.split('').reduce((acc, char) => {
       return ((acc << 5) - acc) + char.charCodeAt(0);
     }, 0);
     
@@ -29,14 +68,14 @@ serve(async (req) => {
     
     // Boost score based on viral indicators
     let score = baseScore;
-    const lowerIdea = idea.toLowerCase();
+    const lowerIdea = trimmedIdea.toLowerCase();
     
     if (lowerIdea.includes('pov') || lowerIdea.includes('storytime')) score += 5;
     if (lowerIdea.match(/\?|!|😱|🚩|💔/)) score += 3;
     if (lowerIdea.includes('dating') || lowerIdea.includes('relationship')) score += 4;
     if (lowerIdea.includes('horror') || lowerIdea.includes('scary')) score += 4;
     if (lowerIdea.includes('toxic') || lowerIdea.includes('red flag')) score += 3;
-    if (idea.length > 100) score += 2; // More detail = better
+    if (trimmedIdea.length > 100) score += 2; // More detail = better
     
     score = Math.min(Math.round(score), 98); // Cap at 98
 
