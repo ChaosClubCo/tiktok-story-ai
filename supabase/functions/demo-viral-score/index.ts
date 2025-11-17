@@ -1,14 +1,11 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { checkRateLimit } from "../_shared/rateLimit.ts";
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+import { corsHeaders, handleCorsPreflightRequest } from "../_shared/corsHeaders.ts";
+import { createErrorResponse, createSuccessResponse } from "../_shared/errorHandler.ts";
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+    return handleCorsPreflightRequest();
   }
 
   try {
@@ -113,23 +110,13 @@ serve(async (req) => {
       tips.push('Focus on universal emotions (betrayal, fear, revenge)');
     }
 
-    return new Response(
-      JSON.stringify({
-        score,
-        summary,
-        tips: tips.slice(0, 3)
-      }),
-      { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200 
-      }
-    );
+    return createSuccessResponse({ 
+      score, 
+      summary, 
+      tips: tips.slice(0, 3) 
+    });
 
   } catch (error) {
-    console.error('Error in demo-viral-score:', error);
-    return new Response(
-      JSON.stringify({ error: 'Failed to analyze script idea' }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    return createErrorResponse(error.message || 'Failed to analyze script idea');
   }
 });
