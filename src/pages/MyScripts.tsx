@@ -12,6 +12,7 @@ import { Trash2, Download, Eye, CheckSquare, Square, Loader2, History, Save } fr
 import { Header } from "@/components/Header";
 import { ScriptVersionHistory } from "@/components/ScriptVersionHistory";
 import { useNavigate } from "react-router-dom";
+import { useAutoVersion } from "@/hooks/useAutoVersion";
 
 interface SavedScript {
   id: string;
@@ -44,7 +45,21 @@ const MyScripts = () => {
   const [batchResults, setBatchResults] = useState<BatchAnalysisResult[]>([]);
   const [versionHistoryScript, setVersionHistoryScript] = useState<SavedScript | null>(null);
   const [versionHistoryOpen, setVersionHistoryOpen] = useState(false);
+  const [editingScript, setEditingScript] = useState<SavedScript | null>(null);
   const { toast } = useToast();
+
+  // Auto-versioning for the script being edited
+  const { checkAndCreateVersion } = useAutoVersion(
+    editingScript?.id || null,
+    editingScript ? {
+      content: editingScript.content,
+      title: editingScript.title,
+      niche: editingScript.niche,
+      length: editingScript.length,
+      tone: editingScript.tone,
+      timestamp: Date.now(),
+    } : null
+  );
 
   useEffect(() => {
     if (user) {
@@ -155,8 +170,20 @@ const MyScripts = () => {
 
   const handleCreateVersion = async (scriptId: string, description?: string) => {
     try {
+      const script = scripts.find(s => s.id === scriptId);
+      if (!script) return;
+
       const { data, error } = await supabase.functions.invoke('create-script-version', {
-        body: { scriptId, changeDescription: description }
+        body: { 
+          scriptId,
+          title: script.title,
+          content: script.content,
+          niche: script.niche,
+          length: script.length,
+          tone: script.tone,
+          changeDescription: description || 'Manual save',
+          userId: user?.id
+        }
       });
 
       if (error) throw error;
@@ -166,7 +193,7 @@ const MyScripts = () => {
         description: `Version ${data.version.version_number} created successfully`,
       });
 
-      fetchScripts(); // Refresh to show updated version number
+      fetchScripts();
     } catch (error) {
       console.error('Error creating version:', error);
       toast({
@@ -176,6 +203,30 @@ const MyScripts = () => {
       });
     }
   };
+
+  // Track when a script is being edited
+  const handleEdit = (script: SavedScript) => {
+    setEditingScript(script);
+  };
+
+  // Trigger auto-version check when user navigates away or runs analysis
+  useEffect(() => {
+    return () => {
+      if (editingScript && user) {
+        checkAndCreateVersion(
+          {
+            content: editingScript.content,
+            title: editingScript.title,
+            niche: editingScript.niche,
+            length: editingScript.length,
+            tone: editingScript.tone,
+            timestamp: Date.now(),
+          },
+          user.id
+        );
+      }
+    };
+  }, [editingScript, user]);
 
   const handleShowVersionHistory = (script: SavedScript) => {
     setVersionHistoryScript(script);
