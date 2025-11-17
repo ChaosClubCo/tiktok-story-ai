@@ -3,30 +3,48 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { Header } from "@/components/Header";
-import AnalyticsChart from "@/components/AnalyticsChart";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { TrendingUp, FileText, Eye, Heart, Share, Calendar, Download, Filter } from "lucide-react";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Progress } from "@/components/ui/progress";
+import { TrendingUp, FileText, Target, Calendar, ArrowUpRight, ArrowDownRight } from "lucide-react";
+import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { format, subDays } from 'date-fns';
 
-interface SavedScript {
+interface Script {
   id: string;
   title: string;
-  content: string;
   niche: string;
-  length: string;
-  tone: string;
-  topic?: string;
   created_at: string;
-  updated_at: string;
+}
+
+interface Prediction {
+  id: string;
+  script_id: string | null;
+  title: string;
+  niche: string | null;
+  viral_score: number;
+  engagement_score: number;
+  shareability_score: number;
+  hook_strength: number;
+  emotional_impact: number;
+  conflict_clarity: number;
+  pacing_quality: number;
+  dialogue_quality: number;
+  quotability: number;
+  relatability: number;
+  prediction_type: string;
+  created_at: string;
 }
 
 const Analytics = () => {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
-  const [scripts, setScripts] = useState<SavedScript[]>([]);
+  const [scripts, setScripts] = useState<Script[]>([]);
+  const [predictions, setPredictions] = useState<Prediction[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [timeRange, setTimeRange] = useState("30d");
   const [nicheFilter, setNicheFilter] = useState("all");
@@ -35,51 +53,101 @@ const Analytics = () => {
     if (!loading && !user) {
       navigate("/auth");
     } else if (user) {
-      fetchScripts();
+      fetchData();
     }
   }, [user, loading, navigate]);
 
-  const fetchScripts = async () => {
+  const fetchData = async () => {
+    setIsLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('scripts')
-        .select('*')
-        .eq('user_id', user?.id)
-        .order('created_at', { ascending: false });
+      const [scriptsRes, predictionsRes] = await Promise.all([
+        supabase.from('scripts').select('id, title, niche, created_at').eq('user_id', user?.id).order('created_at', { ascending: false }),
+        supabase.from('predictions_history').select('*').eq('user_id', user?.id).order('created_at', { ascending: false })
+      ]);
 
-      if (error) throw error;
-      setScripts(data || []);
+      if (scriptsRes.error) throw scriptsRes.error;
+      if (predictionsRes.error) throw predictionsRes.error;
+
+      setScripts(scriptsRes.data || []);
+      setPredictions(predictionsRes.data || []);
     } catch (error) {
-      console.error('Error fetching scripts:', error);
+      console.error('Error fetching analytics:', error);
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Mock analytics data - in real app, this would come from actual performance data
-  const mockPerformanceData = scripts.map((script, index) => ({
-    id: script.id,
-    title: script.title,
-    views: Math.floor(Math.random() * 100000) + 1000,
-    likes: Math.floor(Math.random() * 10000) + 100,
-    shares: Math.floor(Math.random() * 1000) + 10,
-    comments: Math.floor(Math.random() * 500) + 5,
-    engagement_rate: (Math.random() * 10 + 2).toFixed(1),
-    created_at: script.created_at,
-    niche: script.niche,
-    performance_score: Math.floor(Math.random() * 40) + 60
-  }));
+  const getFilteredByTime = (data: any[]) => {
+    const days = timeRange === "7d" ? 7 : timeRange === "30d" ? 30 : timeRange === "90d" ? 90 : timeRange === "1y" ? 365 : 999999;
+    const cutoff = subDays(new Date(), days);
+    return data.filter(item => new Date(item.created_at) >= cutoff);
+  };
 
-  const totalViews = mockPerformanceData.reduce((sum, script) => sum + script.views, 0);
-  const totalLikes = mockPerformanceData.reduce((sum, script) => sum + script.likes, 0);
-  const totalShares = mockPerformanceData.reduce((sum, script) => sum + script.shares, 0);
-  const avgEngagementRate = mockPerformanceData.length > 0 
-    ? (mockPerformanceData.reduce((sum, script) => sum + parseFloat(script.engagement_rate), 0) / mockPerformanceData.length).toFixed(1)
+  const filteredPredictions = nicheFilter === "all" 
+    ? getFilteredByTime(predictions)
+    : getFilteredByTime(predictions).filter(p => p.niche === nicheFilter);
+
+  const totalScripts = scripts.length;
+  const totalPredictions = predictions.length;
+  const avgViralScore = filteredPredictions.length > 0
+    ? Math.round(filteredPredictions.reduce((sum, p) => sum + p.viral_score, 0) / filteredPredictions.length)
     : 0;
 
-  const filteredData = nicheFilter === "all" 
-    ? mockPerformanceData 
-    : mockPerformanceData.filter(script => script.niche === nicheFilter);
+  const bestScript = filteredPredictions.reduce((best, p) => 
+    (!best || p.viral_score > best.viral_score) ? p : best
+  , null as Prediction | null);
+
+  const firstFive = predictions.slice(-5);
+  const lastFive = predictions.slice(0, 5);
+  const avgFirst = firstFive.length > 0 ? firstFive.reduce((sum, p) => sum + p.viral_score, 0) / firstFive.length : 0;
+  const avgLast = lastFive.length > 0 ? lastFive.reduce((sum, p) => sum + p.viral_score, 0) / lastFive.length : 0;
+  const improvementRate = avgFirst > 0 ? Math.round(((avgLast - avgFirst) / avgFirst) * 100) : 0;
+
+  const trendData = filteredPredictions.slice(0, 20).reverse().map((p) => ({
+    date: format(new Date(p.created_at), 'MMM d'),
+    viralScore: p.viral_score,
+    engagement: p.engagement_score,
+    shareability: p.shareability_score,
+  }));
+
+  const nicheStats = filteredPredictions.reduce((acc, p) => {
+    const niche = p.niche || 'Unknown';
+    if (!acc[niche]) {
+      acc[niche] = { niche, count: 0, totalScore: 0, bestScore: 0 };
+    }
+    acc[niche].count++;
+    acc[niche].totalScore += p.viral_score;
+    acc[niche].bestScore = Math.max(acc[niche].bestScore, p.viral_score);
+    return acc;
+  }, {} as Record<string, { niche: string; count: number; totalScore: number; bestScore: number }>);
+
+  const nichePerformance = Object.values(nicheStats).map((n: any) => ({
+    niche: n.niche,
+    avgScore: Math.round(n.totalScore / n.count),
+    count: n.count,
+    bestScore: n.bestScore,
+  })).sort((a, b) => b.avgScore - a.avgScore);
+
+  const typeBreakdown = filteredPredictions.reduce((acc, p) => {
+    const type = p.prediction_type;
+    acc[type] = (acc[type] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
+
+  const pieData = Object.entries(typeBreakdown).map(([name, value]) => ({ name, value }));
+  const COLORS = ['hsl(var(--primary))', 'hsl(var(--secondary))', 'hsl(var(--accent))'];
+
+  const radarData = [
+    { metric: 'Hook', score: Math.round(filteredPredictions.reduce((s, p) => s + p.hook_strength, 0) / (filteredPredictions.length || 1)) },
+    { metric: 'Emotion', score: Math.round(filteredPredictions.reduce((s, p) => s + p.emotional_impact, 0) / (filteredPredictions.length || 1)) },
+    { metric: 'Conflict', score: Math.round(filteredPredictions.reduce((s, p) => s + p.conflict_clarity, 0) / (filteredPredictions.length || 1)) },
+    { metric: 'Pacing', score: Math.round(filteredPredictions.reduce((s, p) => s + p.pacing_quality, 0) / (filteredPredictions.length || 1)) },
+    { metric: 'Dialogue', score: Math.round(filteredPredictions.reduce((s, p) => s + p.dialogue_quality, 0) / (filteredPredictions.length || 1)) },
+    { metric: 'Quotability', score: Math.round(filteredPredictions.reduce((s, p) => s + p.quotability, 0) / (filteredPredictions.length || 1)) },
+  ];
+
+  const topScripts = [...filteredPredictions].sort((a, b) => b.viral_score - a.viral_score).slice(0, 10);
+  const uniqueNiches = Array.from(new Set(predictions.map(p => p.niche).filter(Boolean)));
 
   if (loading || isLoading) {
     return (
@@ -117,7 +185,6 @@ const Analytics = () => {
           </p>
         </div>
 
-        {/* Filters */}
         <div className="flex flex-wrap gap-4 mb-6">
           <Select value={timeRange} onValueChange={setTimeRange}>
             <SelectTrigger className="w-[180px]">
@@ -128,6 +195,7 @@ const Analytics = () => {
               <SelectItem value="30d">Last 30 days</SelectItem>
               <SelectItem value="90d">Last 3 months</SelectItem>
               <SelectItem value="1y">Last year</SelectItem>
+              <SelectItem value="all">All time</SelectItem>
             </SelectContent>
           </Select>
 
@@ -137,33 +205,25 @@ const Analytics = () => {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All niches</SelectItem>
-              <SelectItem value="dating">Dating</SelectItem>
-              <SelectItem value="horror">Horror</SelectItem>
-              <SelectItem value="comedy">Comedy</SelectItem>
-              <SelectItem value="lifestyle">Lifestyle</SelectItem>
-              <SelectItem value="drama">Drama</SelectItem>
+              {uniqueNiches.map(niche => (
+                <SelectItem key={niche} value={niche!}>{niche}</SelectItem>
+              ))}
             </SelectContent>
           </Select>
-
-          <Button variant="outline" className="flex items-center gap-2">
-            <Filter className="w-4 h-4" />
-            More Filters
-          </Button>
         </div>
 
-        {/* Overview Stats */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
           <Card>
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-muted-foreground">Total Views</p>
-                  <p className="text-2xl font-bold">{totalViews.toLocaleString()}</p>
+                  <p className="text-sm font-medium text-muted-foreground">Total Scripts</p>
+                  <p className="text-2xl font-bold">{totalScripts}</p>
                 </div>
-                <Eye className="h-8 w-8 text-blue-500" />
+                <FileText className="h-8 w-8 text-primary" />
               </div>
               <p className="text-xs text-muted-foreground mt-2">
-                <span className="text-green-500">+12.3%</span> from last month
+                {totalPredictions} predictions run
               </p>
             </CardContent>
           </Card>
@@ -172,13 +232,25 @@ const Analytics = () => {
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-muted-foreground">Total Likes</p>
-                  <p className="text-2xl font-bold">{totalLikes.toLocaleString()}</p>
+                  <p className="text-sm font-medium text-muted-foreground">Avg Viral Score</p>
+                  <p className="text-2xl font-bold">{avgViralScore}/100</p>
                 </div>
-                <Heart className="h-8 w-8 text-red-500" />
+                <TrendingUp className="h-8 w-8 text-secondary" />
               </div>
-              <p className="text-xs text-muted-foreground mt-2">
-                <span className="text-green-500">+8.7%</span> from last month
+              <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1">
+                {improvementRate > 0 ? (
+                  <>
+                    <ArrowUpRight className="w-3 h-3 text-green-500" />
+                    <span className="text-green-500">+{improvementRate}%</span> improvement
+                  </>
+                ) : improvementRate < 0 ? (
+                  <>
+                    <ArrowDownRight className="w-3 h-3 text-red-500" />
+                    <span className="text-red-500">{improvementRate}%</span> decline
+                  </>
+                ) : (
+                  <span>No change</span>
+                )}
               </p>
             </CardContent>
           </Card>
@@ -187,13 +259,13 @@ const Analytics = () => {
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-muted-foreground">Total Shares</p>
-                  <p className="text-2xl font-bold">{totalShares.toLocaleString()}</p>
+                  <p className="text-sm font-medium text-muted-foreground">Best Script</p>
+                  <p className="text-lg font-bold truncate">{bestScript?.title || 'N/A'}</p>
                 </div>
-                <Share className="h-8 w-8 text-green-500" />
+                <Target className="h-8 w-8 text-accent" />
               </div>
               <p className="text-xs text-muted-foreground mt-2">
-                <span className="text-green-500">+15.2%</span> from last month
+                Score: {bestScript?.viral_score || 0}/100
               </p>
             </CardContent>
           </Card>
@@ -202,164 +274,195 @@ const Analytics = () => {
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-muted-foreground">Avg. Engagement</p>
-                  <p className="text-2xl font-bold">{avgEngagementRate}%</p>
+                  <p className="text-sm font-medium text-muted-foreground">High Scorers</p>
+                  <p className="text-2xl font-bold">{filteredPredictions.filter(p => p.viral_score >= 80).length}</p>
                 </div>
-                <TrendingUp className="h-8 w-8 text-purple-500" />
+                <Calendar className="h-8 w-8 text-primary" />
               </div>
               <p className="text-xs text-muted-foreground mt-2">
-                <span className="text-green-500">+2.1%</span> from last month
+                Scripts with 80+ score
               </p>
             </CardContent>
           </Card>
         </div>
 
-        {/* Main Analytics Content */}
-        <Tabs defaultValue="overview" className="space-y-6">
-          <TabsList>
-            <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="scripts">Script Performance</TabsTrigger>
+        <Tabs defaultValue="trends" className="space-y-6">
+          <TabsList className="grid w-full max-w-md grid-cols-3">
             <TabsTrigger value="trends">Trends</TabsTrigger>
+            <TabsTrigger value="performance">Performance</TabsTrigger>
+            <TabsTrigger value="insights">Insights</TabsTrigger>
           </TabsList>
-          
-          <TabsContent value="overview" className="space-y-6">
+
+          <TabsContent value="trends" className="space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle>Performance Over Time</CardTitle>
-                <CardDescription>Views, likes, and engagement trends</CardDescription>
+                <CardTitle>Viral Score Trends</CardTitle>
+                <CardDescription>Track your performance over time</CardDescription>
               </CardHeader>
               <CardContent>
-                <AnalyticsChart data={filteredData} />
+                <ResponsiveContainer width="100%" height={300}>
+                  <LineChart data={trendData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                    <XAxis dataKey="date" stroke="hsl(var(--muted-foreground))" />
+                    <YAxis stroke="hsl(var(--muted-foreground))" />
+                    <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))' }} />
+                    <Legend />
+                    <Line type="monotone" dataKey="viralScore" stroke="hsl(var(--primary))" name="Viral Score" strokeWidth={2} />
+                    <Line type="monotone" dataKey="engagement" stroke="hsl(var(--secondary))" name="Engagement" strokeWidth={2} />
+                    <Line type="monotone" dataKey="shareability" stroke="hsl(var(--accent))" name="Shareability" strokeWidth={2} />
+                  </LineChart>
+                </ResponsiveContainer>
               </CardContent>
             </Card>
-          </TabsContent>
-          
-          <TabsContent value="scripts" className="space-y-6">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <div>
-                  <CardTitle>Individual Script Performance</CardTitle>
-                  <CardDescription>Detailed metrics for each script</CardDescription>
-                </div>
-                <Button variant="outline" className="flex items-center gap-2">
-                  <Download className="w-4 h-4" />
-                  Export Data
-                </Button>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {filteredData.map((script) => (
-                    <div key={script.id} className="border rounded-lg p-4 hover:bg-secondary/50 transition-colors">
-                      <div className="flex justify-between items-start mb-2">
-                        <div>
-                          <h3 className="font-semibold">{script.title}</h3>
-                          <div className="flex items-center gap-2 mt-1">
-                            <Badge variant="outline">{script.niche}</Badge>
-                            <span className="text-sm text-muted-foreground">
-                              {new Date(script.created_at).toLocaleDateString()}
-                            </span>
-                          </div>
-                        </div>
-                        <Badge 
-                          variant={script.performance_score >= 80 ? "default" : script.performance_score >= 60 ? "secondary" : "destructive"}
-                        >
-                          {script.performance_score}% Score
-                        </Badge>
-                      </div>
-                      
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
-                        <div className="text-center">
-                          <p className="text-sm text-muted-foreground">Views</p>
-                          <p className="font-semibold">{script.views.toLocaleString()}</p>
-                        </div>
-                        <div className="text-center">
-                          <p className="text-sm text-muted-foreground">Likes</p>
-                          <p className="font-semibold">{script.likes.toLocaleString()}</p>
-                        </div>
-                        <div className="text-center">
-                          <p className="text-sm text-muted-foreground">Shares</p>
-                          <p className="font-semibold">{script.shares.toLocaleString()}</p>
-                        </div>
-                        <div className="text-center">
-                          <p className="text-sm text-muted-foreground">Engagement</p>
-                          <p className="font-semibold">{script.engagement_rate}%</p>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-          
-          <TabsContent value="trends" className="space-y-6">
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <Card>
                 <CardHeader>
-                  <CardTitle>Top Performing Niches</CardTitle>
-                  <CardDescription>Your best performing content categories</CardDescription>
+                  <CardTitle>Prediction Type Breakdown</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-4">
-                    {['dating', 'horror', 'comedy', 'drama'].map((niche, index) => {
-                      const nichePerformance = mockPerformanceData.filter(s => s.niche === niche);
-                      const avgScore = nichePerformance.length > 0 
-                        ? nichePerformance.reduce((sum, s) => sum + s.performance_score, 0) / nichePerformance.length 
-                        : 0;
-                      
-                      return (
-                        <div key={niche} className="flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                              <span className="text-sm font-medium">{index + 1}</span>
-                            </div>
-                            <div>
-                              <p className="font-medium capitalize">{niche}</p>
-                              <p className="text-sm text-muted-foreground">{nichePerformance.length} scripts</p>
-                            </div>
-                          </div>
-                          <Badge variant="secondary">{avgScore.toFixed(0)}% avg</Badge>
-                        </div>
-                      );
-                    })}
-                  </div>
+                  <ResponsiveContainer width="100%" height={250}>
+                    <PieChart>
+                      <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} label>
+                        {pieData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip />
+                      <Legend />
+                    </PieChart>
+                  </ResponsiveContainer>
                 </CardContent>
               </Card>
 
               <Card>
                 <CardHeader>
-                  <CardTitle>Content Insights</CardTitle>
-                  <CardDescription>AI-powered recommendations</CardDescription>
+                  <CardTitle>Content Quality Radar</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-4">
-                    <div className="p-3 bg-green-50 dark:bg-green-950/20 rounded-lg border border-green-200 dark:border-green-800">
-                      <p className="text-sm font-medium text-green-800 dark:text-green-200">
-                        🎯 Trending Opportunity
-                      </p>
-                      <p className="text-sm text-green-700 dark:text-green-300 mt-1">
-                        Horror content is performing 23% better this week. Consider creating more scary scenarios.
+                  <ResponsiveContainer width="100%" height={250}>
+                    <RadarChart data={radarData}>
+                      <PolarGrid stroke="hsl(var(--border))" />
+                      <PolarAngleAxis dataKey="metric" stroke="hsl(var(--foreground))" />
+                      <PolarRadiusAxis angle={90} domain={[0, 100]} stroke="hsl(var(--muted-foreground))" />
+                      <Radar name="Your Average" dataKey="score" stroke="hsl(var(--primary))" fill="hsl(var(--primary))" fillOpacity={0.6} />
+                    </RadarChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="performance" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Niche Performance</CardTitle>
+                <CardDescription>See which niches perform best</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={nichePerformance}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                    <XAxis dataKey="niche" stroke="hsl(var(--muted-foreground))" />
+                    <YAxis stroke="hsl(var(--muted-foreground))" />
+                    <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))' }} />
+                    <Legend />
+                    <Bar dataKey="avgScore" fill="hsl(var(--primary))" name="Avg Score" />
+                    <Bar dataKey="bestScore" fill="hsl(var(--secondary))" name="Best Score" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Top Performing Scripts</CardTitle>
+                <CardDescription>Your highest-scoring content</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Title</TableHead>
+                      <TableHead>Niche</TableHead>
+                      <TableHead>Viral Score</TableHead>
+                      <TableHead>Date</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {topScripts.map((script) => (
+                      <TableRow key={script.id}>
+                        <TableCell className="font-medium">{script.title}</TableCell>
+                        <TableCell>
+                          <Badge variant="secondary">{script.niche}</Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={script.viral_score >= 80 ? 'default' : 'secondary'}>
+                            {script.viral_score}/100
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {format(new Date(script.created_at), 'MMM d, yyyy')}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="insights" className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Niche Success Rates</CardTitle>
+                  <CardDescription>Average scores by niche</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {nichePerformance.map((niche) => (
+                    <div key={niche.niche} className="space-y-2">
+                      <div className="flex justify-between text-sm">
+                        <span className="font-medium">{niche.niche}</span>
+                        <span className="text-muted-foreground">{niche.avgScore}/100</span>
+                      </div>
+                      <Progress value={niche.avgScore} className="h-2" />
+                      <p className="text-xs text-muted-foreground">{niche.count} scripts</p>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Recommendations</CardTitle>
+                  <CardDescription>Based on your performance</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {nichePerformance[0] && (
+                    <div className="p-4 rounded-lg bg-primary/10 border border-primary/20">
+                      <p className="text-sm font-medium">🎯 Best Performing Niche</p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Focus on <strong>{nichePerformance[0].niche}</strong> - averaging {nichePerformance[0].avgScore}/100
                       </p>
                     </div>
-                    
-                    <div className="p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-800">
-                      <p className="text-sm font-medium text-blue-800 dark:text-blue-200">
-                        📈 Optimization Tip
-                      </p>
-                      <p className="text-sm text-blue-700 dark:text-blue-300 mt-1">
-                        Your dating scripts get 2x more engagement on weekends. Schedule accordingly.
-                      </p>
-                    </div>
-                    
-                    <div className="p-3 bg-purple-50 dark:bg-purple-950/20 rounded-lg border border-purple-200 dark:border-purple-800">
-                      <p className="text-sm font-medium text-purple-800 dark:text-purple-200">
-                        🚀 Growth Strategy
-                      </p>
-                      <p className="text-sm text-purple-700 dark:text-purple-300 mt-1">
-                        Scripts with 3-4 hashtags perform best. Avoid using more than 5.
+                  )}
+                  {avgViralScore < 70 && (
+                    <div className="p-4 rounded-lg bg-secondary/10 border border-secondary/20">
+                      <p className="text-sm font-medium">📈 Improvement Opportunity</p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Your average score is {avgViralScore}. Focus on hook strength and emotional impact to boost engagement.
                       </p>
                     </div>
-                  </div>
+                  )}
+                  {radarData.find(d => d.metric === 'Hook' && d.score < 70) && (
+                    <div className="p-4 rounded-lg bg-accent/10 border border-accent/20">
+                      <p className="text-sm font-medium">🎣 Strengthen Your Hooks</p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Your hook scores are below 70. Try using more intriguing questions or bold statements.
+                      </p>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </div>
