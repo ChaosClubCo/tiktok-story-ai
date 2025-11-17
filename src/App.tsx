@@ -16,6 +16,7 @@ import Collaborate from "./pages/Collaborate";
 import Predictions from "./pages/Predictions";
 import Series from "./pages/Series";
 import SeriesBuilder from "./pages/SeriesBuilder";
+import ABTests from "./pages/ABTests";
 import NotFound from "./pages/NotFound";
 import { AdminLayout } from "./pages/admin/AdminLayout";
 import { AdminUsersPage } from "./pages/admin/UsersPage";
@@ -43,6 +44,7 @@ const App = () => {
                 <Route path="/predictions" element={<Predictions />} />
                 <Route path="/series" element={<Series />} />
                 <Route path="/series/builder" element={<SeriesBuilder />} />
+                <Route path="/ab-tests" element={<ABTests />} />
                 <Route path="/auth" element={<Auth />} />
                 <Route path="/my-scripts" element={<MyScripts />} />
                 <Route path="/admin" element={<AdminLayout />}>

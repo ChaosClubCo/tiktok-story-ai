@@ -14,6 +14,178 @@ export type Database = {
   }
   public: {
     Tables: {
+      ab_test_results: {
+        Row: {
+          id: string
+          metric_name: string
+          metric_value: number
+          recorded_at: string | null
+          test_id: string
+          variant_id: string
+        }
+        Insert: {
+          id?: string
+          metric_name: string
+          metric_value: number
+          recorded_at?: string | null
+          test_id: string
+          variant_id: string
+        }
+        Update: {
+          id?: string
+          metric_name?: string
+          metric_value?: number
+          recorded_at?: string | null
+          test_id?: string
+          variant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ab_test_results_test_id_fkey"
+            columns: ["test_id"]
+            isOneToOne: false
+            referencedRelation: "ab_tests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ab_test_results_variant_id_fkey"
+            columns: ["variant_id"]
+            isOneToOne: false
+            referencedRelation: "ab_test_variants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ab_test_variants: {
+        Row: {
+          branch_id: string | null
+          content: string
+          created_at: string | null
+          emotional_impact: number | null
+          engagement_score: number | null
+          hook_strength: number | null
+          id: string
+          prediction_id: string | null
+          shareability_score: number | null
+          test_id: string
+          trend_alignment: number | null
+          user_preference_votes: number | null
+          variant_name: string
+          version_id: string | null
+          viral_score: number | null
+        }
+        Insert: {
+          branch_id?: string | null
+          content: string
+          created_at?: string | null
+          emotional_impact?: number | null
+          engagement_score?: number | null
+          hook_strength?: number | null
+          id?: string
+          prediction_id?: string | null
+          shareability_score?: number | null
+          test_id: string
+          trend_alignment?: number | null
+          user_preference_votes?: number | null
+          variant_name: string
+          version_id?: string | null
+          viral_score?: number | null
+        }
+        Update: {
+          branch_id?: string | null
+          content?: string
+          created_at?: string | null
+          emotional_impact?: number | null
+          engagement_score?: number | null
+          hook_strength?: number | null
+          id?: string
+          prediction_id?: string | null
+          shareability_score?: number | null
+          test_id?: string
+          trend_alignment?: number | null
+          user_preference_votes?: number | null
+          variant_name?: string
+          version_id?: string | null
+          viral_score?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ab_test_variants_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "script_branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ab_test_variants_prediction_id_fkey"
+            columns: ["prediction_id"]
+            isOneToOne: false
+            referencedRelation: "predictions_history"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ab_test_variants_test_id_fkey"
+            columns: ["test_id"]
+            isOneToOne: false
+            referencedRelation: "ab_tests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ab_test_variants_version_id_fkey"
+            columns: ["version_id"]
+            isOneToOne: false
+            referencedRelation: "script_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ab_tests: {
+        Row: {
+          completed_at: string | null
+          created_at: string | null
+          hypothesis: string | null
+          id: string
+          notes: string | null
+          script_id: string
+          status: string | null
+          test_name: string
+          user_id: string
+          winner_variant_id: string | null
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string | null
+          hypothesis?: string | null
+          id?: string
+          notes?: string | null
+          script_id: string
+          status?: string | null
+          test_name: string
+          user_id: string
+          winner_variant_id?: string | null
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string | null
+          hypothesis?: string | null
+          id?: string
+          notes?: string | null
+          script_id?: string
+          status?: string | null
+          test_name?: string
+          user_id?: string
+          winner_variant_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ab_tests_script_id_fkey"
+            columns: ["script_id"]
+            isOneToOne: false
+            referencedRelation: "scripts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       admin_audit_log: {
         Row: {
           action: string
@@ -184,8 +356,82 @@ export type Database = {
         }
         Relationships: []
       }
+      script_branches: {
+        Row: {
+          branch_name: string
+          created_at: string | null
+          created_from_version: number
+          current_version_content: string
+          id: string
+          is_active: boolean | null
+          length: string | null
+          merged_at: string | null
+          merged_by: string | null
+          niche: string | null
+          parent_branch_id: string | null
+          script_id: string
+          tone: string | null
+          topic: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          branch_name: string
+          created_at?: string | null
+          created_from_version: number
+          current_version_content: string
+          id?: string
+          is_active?: boolean | null
+          length?: string | null
+          merged_at?: string | null
+          merged_by?: string | null
+          niche?: string | null
+          parent_branch_id?: string | null
+          script_id: string
+          tone?: string | null
+          topic?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          branch_name?: string
+          created_at?: string | null
+          created_from_version?: number
+          current_version_content?: string
+          id?: string
+          is_active?: boolean | null
+          length?: string | null
+          merged_at?: string | null
+          merged_by?: string | null
+          niche?: string | null
+          parent_branch_id?: string | null
+          script_id?: string
+          tone?: string | null
+          topic?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "script_branches_parent_branch_id_fkey"
+            columns: ["parent_branch_id"]
+            isOneToOne: false
+            referencedRelation: "script_branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "script_branches_script_id_fkey"
+            columns: ["script_id"]
+            isOneToOne: false
+            referencedRelation: "scripts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       script_versions: {
         Row: {
+          branch_id: string | null
+          branch_name: string | null
           change_description: string | null
           content: string
           created_at: string
@@ -202,6 +448,8 @@ export type Database = {
           viral_score: number | null
         }
         Insert: {
+          branch_id?: string | null
+          branch_name?: string | null
           change_description?: string | null
           content: string
           created_at?: string
@@ -218,6 +466,8 @@ export type Database = {
           viral_score?: number | null
         }
         Update: {
+          branch_id?: string | null
+          branch_name?: string | null
           change_description?: string | null
           content?: string
           created_at?: string
@@ -234,6 +484,13 @@ export type Database = {
           viral_score?: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "script_versions_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "script_branches"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "script_versions_prediction_id_fkey"
             columns: ["prediction_id"]
@@ -252,6 +509,7 @@ export type Database = {
       }
       scripts: {
         Row: {
+          active_branch_id: string | null
           beat_markers: Json | null
           content: string
           content_safety_flags: Json | null
@@ -275,6 +533,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          active_branch_id?: string | null
           beat_markers?: Json | null
           content: string
           content_safety_flags?: Json | null
@@ -298,6 +557,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          active_branch_id?: string | null
           beat_markers?: Json | null
           content?: string
           content_safety_flags?: Json | null
@@ -326,6 +586,13 @@ export type Database = {
             columns: ["series_id"]
             isOneToOne: false
             referencedRelation: "series"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scripts_active_branch_id_fkey"
+            columns: ["active_branch_id"]
+            isOneToOne: false
+            referencedRelation: "script_branches"
             referencedColumns: ["id"]
           },
         ]
