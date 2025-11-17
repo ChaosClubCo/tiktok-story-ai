@@ -20,22 +20,11 @@ export const AdminUsersPage = () => {
 
   const fetchUsers = async () => {
     try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select(`
-          user_id,
-          display_name,
-          created_at,
-          subscribers (
-            subscribed,
-            subscription_tier
-          )
-        `)
-        .order('created_at', { ascending: false })
-        .limit(100);
+      // Use secure admin edge function
+      const { data, error } = await supabase.functions.invoke('admin-get-users');
 
       if (error) throw error;
-      setUsers(data || []);
+      setUsers(data?.users || []);
     } catch (error) {
       console.error('Failed to fetch users:', error);
     } finally {

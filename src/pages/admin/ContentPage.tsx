@@ -15,21 +15,11 @@ export const AdminContentPage = () => {
 
   const fetchContent = async () => {
     try {
-      const { data, error } = await supabase
-        .from('scripts')
-        .select(`
-          id,
-          title,
-          script_mode,
-          niche,
-          created_at,
-          profiles (display_name)
-        `)
-        .order('created_at', { ascending: false })
-        .limit(50);
+      // Use secure admin edge function
+      const { data, error } = await supabase.functions.invoke('admin-get-content');
 
       if (error) throw error;
-      setScripts(data || []);
+      setScripts(data?.scripts || []);
     } catch (error) {
       console.error('Failed to fetch content:', error);
     } finally {
