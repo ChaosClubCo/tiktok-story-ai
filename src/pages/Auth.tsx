@@ -12,6 +12,7 @@ import { Loader2, HelpCircle, Mail, Phone, MapPin, RefreshCw } from "lucide-reac
 import { useSecurityMonitoring } from "@/hooks/useSecurityMonitoring";
 import { useRateLimit } from "@/hooks/useRateLimit";
 import { SecurityIndicator } from "@/components/SecurityIndicator";
+import { signUpSchema, loginSchema, passwordResetSchema } from "@/lib/authValidation";
 
 const Auth = () => {
   const [email, setEmail] = useState("");
@@ -65,37 +66,19 @@ const Auth = () => {
     
     setIsLoading(true);
 
-    if (!email || !password) {
+    // Validate with Zod
+    const validation = signUpSchema.safeParse({ 
+      email, 
+      password, 
+      captcha: captcha.userAnswer 
+    });
+    
+    if (!validation.success) {
+      const firstError = validation.error.errors[0];
       toast({
-        title: "Missing Information",
-        description: "Please enter both email and password",
         variant: "destructive",
-      });
-      setIsLoading(false);
-      return;
-    }
-
-    // Enhanced password validation
-    if (password.length < 8) {
-      toast({
-        title: "Password Too Short",
-        description: "Password must be at least 8 characters long",
-        variant: "destructive",
-      });
-      setIsLoading(false);
-      return;
-    }
-
-    const hasUppercase = /[A-Z]/.test(password);
-    const hasLowercase = /[a-z]/.test(password);
-    const hasNumbers = /\d/.test(password);
-    const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>]/.test(password);
-
-    if (!hasUppercase || !hasLowercase || !hasNumbers || !hasSpecialChar) {
-      toast({
-        title: "Weak Password",
-        description: "Password must contain uppercase, lowercase, numbers, and special characters",
-        variant: "destructive",
+        title: "Validation Error",
+        description: firstError.message,
       });
       setIsLoading(false);
       return;
@@ -173,11 +156,15 @@ const Auth = () => {
     
     setIsLoading(true);
 
-    if (!email || !password) {
+    // Validate with Zod
+    const validation = loginSchema.safeParse({ email, password });
+    
+    if (!validation.success) {
+      const firstError = validation.error.errors[0];
       toast({
-        title: "Missing Information",
-        description: "Please enter both email and password",
         variant: "destructive",
+        title: "Validation Error",
+        description: firstError.message,
       });
       setIsLoading(false);
       return;
@@ -225,11 +212,15 @@ const Auth = () => {
     
     setIsResetLoading(true);
 
-    if (!resetEmail) {
+    // Validate with Zod
+    const validation = passwordResetSchema.safeParse({ email: resetEmail });
+    
+    if (!validation.success) {
+      const firstError = validation.error.errors[0];
       toast({
-        title: "Missing Email",
-        description: "Please enter your email address",
         variant: "destructive",
+        title: "Validation Error",
+        description: firstError.message,
       });
       setIsResetLoading(false);
       return;
