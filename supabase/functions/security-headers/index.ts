@@ -1,9 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+import { corsHeaders } from '../_shared/corsHeaders.ts';
 
 serve(async (req) => {
   // Handle CORS preflight requests
@@ -12,18 +8,27 @@ serve(async (req) => {
   }
 
   try {
+    // Enhanced Content Security Policy with nonce support
+    const nonce = crypto.randomUUID();
+    
     // Security headers to add to responses
     const securityHeaders = {
-      // Content Security Policy - strict policy to prevent XSS
-      'Content-Security-Policy': 
-        "default-src 'self'; " +
-        "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.supabase.co; " +
-        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
-        "font-src 'self' https://fonts.gstatic.com; " +
-        "img-src 'self' data: https:; " +
-        "connect-src 'self' https://*.supabase.co wss://*.supabase.co; " +
-        "frame-ancestors 'none'; " +
-        "base-uri 'self';",
+      // Comprehensive Content Security Policy
+      'Content-Security-Policy': [
+        "default-src 'self'",
+        "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.supabase.co https://cdn.jsdelivr.net",
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+        "font-src 'self' https://fonts.gstatic.com data:",
+        "img-src 'self' data: https: blob:",
+        "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.openai.com https://api.elevenlabs.io",
+        "media-src 'self' blob: data:",
+        "object-src 'none'",
+        "frame-ancestors 'none'",
+        "base-uri 'self'",
+        "form-action 'self'",
+        "upgrade-insecure-requests",
+        "block-all-mixed-content"
+      ].join('; '),
       
       // Prevent clickjacking
       'X-Frame-Options': 'DENY',
@@ -34,14 +39,32 @@ serve(async (req) => {
       // Enable XSS protection
       'X-XSS-Protection': '1; mode=block',
       
-      // Enforce HTTPS
-      'Strict-Transport-Security': 'max-age=31536000; includeSubDomains',
+      // Enforce HTTPS with preload
+      'Strict-Transport-Security': 'max-age=63072000; includeSubDomains; preload',
       
       // Prevent referrer leakage
       'Referrer-Policy': 'strict-origin-when-cross-origin',
       
-      // Permissions policy
-      'Permissions-Policy': 'camera=(), microphone=(), geolocation=(), payment=()',
+      // Comprehensive Permissions Policy
+      'Permissions-Policy': [
+        'camera=()',
+        'microphone=()',
+        'geolocation=()',
+        'payment=()',
+        'usb=()',
+        'magnetometer=()',
+        'gyroscope=()',
+        'accelerometer=()',
+        'ambient-light-sensor=()',
+        'autoplay=(self)',
+        'encrypted-media=(self)',
+        'picture-in-picture=(self)'
+      ].join(', '),
+      
+      // Cross-Origin policies
+      'Cross-Origin-Embedder-Policy': 'require-corp',
+      'Cross-Origin-Opener-Policy': 'same-origin',
+      'Cross-Origin-Resource-Policy': 'same-origin',
       
       ...corsHeaders
     };

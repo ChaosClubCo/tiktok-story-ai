@@ -36,6 +36,10 @@ export const AdminLayout = () => {
             <FileText className="w-4 h-4 mr-2" />
             Content
           </Button>
+          <Button variant="ghost" onClick={() => navigate('/admin/security')}>
+            <Shield className="w-4 h-4 mr-2" />
+            Security
+          </Button>
           <Button variant="ghost" onClick={() => navigate('/admin/analytics')}>
             <TrendingUp className="w-4 h-4 mr-2" />
             Analytics

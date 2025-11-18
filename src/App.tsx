@@ -20,6 +20,7 @@ import NotFound from "./pages/NotFound";
 import { AdminLayout } from "./pages/admin/AdminLayout";
 import { AdminUsersPage } from "./pages/admin/UsersPage";
 import { AdminContentPage } from "./pages/admin/ContentPage";
+import { SecurityPage } from "./pages/admin/SecurityPage";
 
 const queryClient = new QueryClient();
 
@@ -48,6 +49,7 @@ const App = () => {
                 <Route path="/admin" element={<AdminLayout />}>
                   <Route path="users" element={<AdminUsersPage />} />
                   <Route path="content" element={<AdminContentPage />} />
+                  <Route path="security" element={<SecurityPage />} />
                   <Route path="analytics" element={<div className="p-8 text-center">Analytics Coming Soon</div>} />
                   <Route path="system" element={<div className="p-8 text-center">System Health Coming Soon</div>} />
                 </Route>
