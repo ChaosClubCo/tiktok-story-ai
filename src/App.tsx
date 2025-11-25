@@ -17,6 +17,7 @@ import Predictions from "./pages/Predictions";
 import Series from "./pages/Series";
 import SeriesBuilder from "./pages/SeriesBuilder";
 import NotFound from "./pages/NotFound";
+import Install from "./pages/Install";
 import { AdminLayout } from "./pages/admin/AdminLayout";
 import { AdminUsersPage } from "./pages/admin/UsersPage";
 import { AdminContentPage } from "./pages/admin/ContentPage";
@@ -53,6 +54,7 @@ const App = () => {
                   <Route path="analytics" element={<div className="p-8 text-center">Analytics Coming Soon</div>} />
                   <Route path="system" element={<div className="p-8 text-center">System Health Coming Soon</div>} />
                 </Route>
+                <Route path="/install" element={<Install />} />
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />
               </Routes>
