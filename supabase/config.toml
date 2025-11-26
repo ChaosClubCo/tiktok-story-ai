@@ -48,3 +48,6 @@ verify_jwt = true
 
 [functions.get-security-events]
 verify_jwt = true
+
+[functions.verify-admin-access]
+verify_jwt = true
