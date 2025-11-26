@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@14.21.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { maskUserInfo, maskSensitiveData } from "../_shared/piiMasking.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -8,7 +9,9 @@ const corsHeaders = {
 };
 
 const logStep = (step: string, details?: any) => {
-  const detailsStr = details ? ` - ${JSON.stringify(details)}` : '';
+  // Automatically mask PII in logged details
+  const maskedDetails = details ? maskSensitiveData(details) : undefined;
+  const detailsStr = maskedDetails ? ` - ${JSON.stringify(maskedDetails)}` : '';
   console.log(`[CREATE-CHECKOUT] ${step}${detailsStr}`);
 };
 
@@ -58,7 +61,7 @@ serve(async (req) => {
         }
       );
     }
-    logStep("User authenticated", { userId: user.id, email: user.email });
+    logStep("User authenticated", maskUserInfo(user));
 
     const requestBody = await req.json();
     const { tier } = requestBody;

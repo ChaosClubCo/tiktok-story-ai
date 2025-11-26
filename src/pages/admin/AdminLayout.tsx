@@ -1,14 +1,31 @@
 import { Outlet, Navigate, useNavigate } from 'react-router-dom';
 import { useAdmin } from '@/hooks/useAdmin';
+import { useAdminRouteProtection } from '@/hooks/useAdminRouteProtection';
 import { Button } from '@/components/ui/button';
 import { Users, FileText, TrendingUp, Settings, Shield } from 'lucide-react';
 
 export const AdminLayout = () => {
   const { isAdmin, loading } = useAdmin();
+  const { isVerifying, isAuthorized } = useAdminRouteProtection('/');
   const navigate = useNavigate();
 
-  if (loading) return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
+  // Show loading state if either check is in progress
+  if (loading || isVerifying) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center space-y-4">
+          <Shield className="w-12 h-12 mx-auto text-primary animate-pulse" />
+          <p className="text-muted-foreground">Verifying admin access...</p>
+        </div>
+      </div>
+    );
+  }
+  
+  // Client-side check (first layer)
   if (!isAdmin) return <Navigate to="/" replace />;
+  
+  // Server-side check (second layer - defense-in-depth)
+  if (!isAuthorized) return <Navigate to="/" replace />;
 
   return (
     <div className="min-h-screen bg-background">
