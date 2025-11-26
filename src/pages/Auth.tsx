@@ -95,14 +95,14 @@ const Auth = () => {
       return;
     }
 
-    // Use hardcoded trusted redirect URL instead of dynamic origin
-    const trustedRedirectUrl = "https://zealous-glacier-01b3a5e10.4.azurestaticapps.net/";
+    // Use environment-based redirect URL (works in dev, preview, and production)
+    const redirectUrl = `${window.location.origin}/`;
     
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
-        emailRedirectTo: trustedRedirectUrl,
+        emailRedirectTo: redirectUrl,
       },
     });
 
