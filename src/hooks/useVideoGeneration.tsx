@@ -227,22 +227,12 @@ export function useVideoGeneration() {
         throw new Error('Not authenticated');
       }
 
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/get-video-projects?projectId=${projectId}`,
-        {
-          method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${session.session.access_token}`,
-            'Content-Type': 'application/json'
-          }
-        }
-      );
+      const { data, error } = await supabase.functions.invoke('get-video-projects', {
+        body: { projectId }
+      });
 
-      if (!response.ok) {
-        throw new Error('Failed to fetch project');
-      }
+      if (error) throw error;
 
-      const data = await response.json();
       return data.project;
     } catch (error: any) {
       console.error('Error fetching project:', error);

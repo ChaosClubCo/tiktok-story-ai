@@ -63,3 +63,6 @@ verify_jwt = true
 
 [functions.get-video-projects]
 verify_jwt = true
+
+[functions.ai-generate]
+verify_jwt = true

@@ -8,8 +8,10 @@ import { Progress } from "@/components/ui/progress";
 import { AuthRequired } from "@/components/shared/AuthRequired";
 import { useAuth } from "@/hooks/useAuth";
 import { useVideoGeneration } from "@/hooks/useVideoGeneration";
+import { useVideoAssembler } from "@/hooks/useVideoAssembler";
+import { VideoPreviewPlayer } from "@/components/VideoPreviewPlayer";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Play, Download, Sparkles, Loader2, Image, Music } from "lucide-react";
+import { ArrowLeft, Play, Download, Sparkles, Loader2, Image, Music, Film } from "lucide-react";
 
 export default function VideoEditor() {
   const { projectId } = useParams<{ projectId: string }>();
@@ -17,6 +19,13 @@ export default function VideoEditor() {
   const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
   const { fetchProject, generateAllScenes, progress, loading } = useVideoGeneration();
+  const {
+    isAssembling,
+    assemblyProgress,
+    assembledVideoUrl,
+    assembleVideo,
+    downloadAssembledVideo,
+  } = useVideoAssembler();
   const [project, setProject] = useState<any>(null);
   const [scenes, setScenes] = useState<any[]>([]);
 
@@ -43,6 +52,22 @@ export default function VideoEditor() {
     if (success) {
       await loadProject();
     }
+  };
+
+  const handleRenderVideo = async () => {
+    if (!scenes.length) return;
+    
+    const success = await assembleVideo(scenes, project?.title || 'video');
+    if (success) {
+      toast({
+        title: 'Video rendered successfully',
+        description: 'Your video is ready to preview and download!',
+      });
+    }
+  };
+
+  const handleDownload = () => {
+    downloadAssembledVideo(`${project?.title || 'video'}.mp4`);
   };
 
   const getSceneStatusColor = (status: string) => {
@@ -192,32 +217,44 @@ export default function VideoEditor() {
             </div>
           </div>
 
-          {completionPercentage === 100 && (
+          {completionPercentage === 100 && !assembledVideoUrl && (
             <Card className="border-primary">
               <CardContent className="pt-6">
                 <div className="text-center space-y-4">
                   <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-success/20">
-                    <Play className="h-8 w-8 text-success" />
+                    <Film className="h-8 w-8 text-success" />
                   </div>
                   <div>
                     <h3 className="text-xl font-bold">All Scenes Generated!</h3>
                     <p className="text-muted-foreground">
-                      Your video is ready for preview and export
+                      Ready to render your final video
                     </p>
                   </div>
-                  <div className="flex gap-4 justify-center">
-                    <Button size="lg" variant="outline">
-                      <Play className="h-5 w-5 mr-2" />
-                      Preview Video
+                  {isAssembling ? (
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-center gap-2">
+                        <Loader2 className="h-5 w-5 animate-spin" />
+                        <span className="text-sm font-medium">{assemblyProgress.stage}</span>
+                      </div>
+                      <Progress value={assemblyProgress.progress} className="h-2" />
+                    </div>
+                  ) : (
+                    <Button size="lg" onClick={handleRenderVideo}>
+                      <Film className="h-5 w-5 mr-2" />
+                      Render Video
                     </Button>
-                    <Button size="lg">
-                      <Download className="h-5 w-5 mr-2" />
-                      Export Video
-                    </Button>
-                  </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
+          )}
+
+          {assembledVideoUrl && (
+            <VideoPreviewPlayer
+              videoUrl={assembledVideoUrl}
+              title={project?.title || 'Video'}
+              onDownload={handleDownload}
+            />
           )}
         </main>
       </div>
