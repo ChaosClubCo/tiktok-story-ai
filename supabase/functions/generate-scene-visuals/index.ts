@@ -1,10 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+import { corsHeaders } from '../_shared/corsHeaders.ts';
+import { generateImage, AI_MODELS } from '../_shared/aiClient.ts';
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -60,44 +57,30 @@ serve(async (req) => {
       .update({ status: 'generating_image' })
       .eq('id', sceneId);
 
-    // Generate image using Lovable AI
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-    if (!LOVABLE_API_KEY) {
-      throw new Error('LOVABLE_API_KEY not configured');
-    }
-
-    console.log('Generating image for scene:', scene.visual_prompt);
-
-    const imageResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'google/gemini-2.5-flash-image',
-        messages: [
-          {
-            role: 'user',
-            content: `Generate a high-quality video scene: ${scene.visual_prompt}. Ultra high resolution, cinematic, 16:9 aspect ratio.`
-          }
-        ],
-        modalities: ['image', 'text']
-      })
+    // Generate image using best model with fallback
+    console.log('Generating image with:', AI_MODELS.imageGeneration.default);
+    
+    const enhancedPrompt = `Ultra high resolution, cinematic, professional, 16:9 aspect ratio: ${scene.visual_prompt}`;
+    
+    let result = await generateImage({
+      prompt: enhancedPrompt,
+      model: AI_MODELS.imageGeneration.default,
     });
 
-    if (!imageResponse.ok) {
-      const errorText = await imageResponse.text();
-      console.error('Image generation failed:', errorText);
-      throw new Error(`Image generation failed: ${errorText}`);
+    // Fallback to fast model on rate limit or payment error
+    if (result.error && (result.error.includes('Rate limit') || result.error.includes('Payment required'))) {
+      console.log('Rate limit or payment error, falling back to fast model');
+      result = await generateImage({
+        prompt: enhancedPrompt,
+        model: AI_MODELS.imageGeneration.fast,
+      });
     }
 
-    const imageData = await imageResponse.json();
-    const imageUrl = imageData.choices?.[0]?.message?.images?.[0]?.image_url?.url;
-
-    if (!imageUrl) {
-      throw new Error('No image generated');
+    if (result.error || !result.imageUrl) {
+      throw new Error(result.error || 'Failed to generate image');
     }
+
+    const imageUrl = result.imageUrl;
 
     // Update scene with image URL
     const { error: updateError } = await supabaseAdmin
