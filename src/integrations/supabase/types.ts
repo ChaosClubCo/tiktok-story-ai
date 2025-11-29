@@ -708,6 +708,169 @@ export type Database = {
         }
         Relationships: []
       }
+      video_assets: {
+        Row: {
+          asset_type: string
+          created_at: string
+          file_size_bytes: number | null
+          id: string
+          metadata: Json | null
+          mime_type: string | null
+          project_id: string
+          scene_id: string | null
+          url: string
+        }
+        Insert: {
+          asset_type: string
+          created_at?: string
+          file_size_bytes?: number | null
+          id?: string
+          metadata?: Json | null
+          mime_type?: string | null
+          project_id: string
+          scene_id?: string | null
+          url: string
+        }
+        Update: {
+          asset_type?: string
+          created_at?: string
+          file_size_bytes?: number | null
+          id?: string
+          metadata?: Json | null
+          mime_type?: string | null
+          project_id?: string
+          scene_id?: string | null
+          url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "video_assets_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "video_projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_assets_scene_id_fkey"
+            columns: ["scene_id"]
+            isOneToOne: false
+            referencedRelation: "video_scenes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      video_projects: {
+        Row: {
+          created_at: string
+          description: string | null
+          duration_seconds: number | null
+          error_message: string | null
+          id: string
+          script_id: string | null
+          settings: Json | null
+          status: string
+          thumbnail_url: string | null
+          title: string
+          updated_at: string
+          user_id: string
+          video_url: string | null
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          duration_seconds?: number | null
+          error_message?: string | null
+          id?: string
+          script_id?: string | null
+          settings?: Json | null
+          status?: string
+          thumbnail_url?: string | null
+          title: string
+          updated_at?: string
+          user_id: string
+          video_url?: string | null
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          duration_seconds?: number | null
+          error_message?: string | null
+          id?: string
+          script_id?: string | null
+          settings?: Json | null
+          status?: string
+          thumbnail_url?: string | null
+          title?: string
+          updated_at?: string
+          user_id?: string
+          video_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "video_projects_script_id_fkey"
+            columns: ["script_id"]
+            isOneToOne: false
+            referencedRelation: "scripts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      video_scenes: {
+        Row: {
+          audio_url: string | null
+          created_at: string
+          duration_seconds: number
+          id: string
+          image_url: string | null
+          project_id: string
+          script_segment: string
+          sequence_order: number
+          settings: Json | null
+          status: string
+          transition_type: string | null
+          updated_at: string
+          visual_prompt: string
+        }
+        Insert: {
+          audio_url?: string | null
+          created_at?: string
+          duration_seconds?: number
+          id?: string
+          image_url?: string | null
+          project_id: string
+          script_segment: string
+          sequence_order: number
+          settings?: Json | null
+          status?: string
+          transition_type?: string | null
+          updated_at?: string
+          visual_prompt: string
+        }
+        Update: {
+          audio_url?: string | null
+          created_at?: string
+          duration_seconds?: number
+          id?: string
+          image_url?: string | null
+          project_id?: string
+          script_segment?: string
+          sequence_order?: number
+          settings?: Json | null
+          status?: string
+          transition_type?: string | null
+          updated_at?: string
+          visual_prompt?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "video_scenes_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "video_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
