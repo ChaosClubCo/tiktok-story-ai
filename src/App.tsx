@@ -16,6 +16,8 @@ import Collaborate from "./pages/Collaborate";
 import Predictions from "./pages/Predictions";
 import Series from "./pages/Series";
 import SeriesBuilder from "./pages/SeriesBuilder";
+import VideoGenerator from "./pages/VideoGenerator";
+import VideoEditor from "./pages/VideoEditor";
 import NotFound from "./pages/NotFound";
 import Install from "./pages/Install";
 import { AdminLayout } from "./pages/admin/AdminLayout";
@@ -45,6 +47,8 @@ const App = () => {
                 <Route path="/predictions" element={<Predictions />} />
                 <Route path="/series" element={<Series />} />
                 <Route path="/series/builder" element={<SeriesBuilder />} />
+                <Route path="/video-generator" element={<VideoGenerator />} />
+                <Route path="/video-editor/:projectId" element={<VideoEditor />} />
                 <Route path="/auth" element={<Auth />} />
                 <Route path="/my-scripts" element={<MyScripts />} />
                 <Route path="/admin" element={<AdminLayout />}>

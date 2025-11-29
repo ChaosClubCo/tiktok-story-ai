@@ -51,3 +51,15 @@ verify_jwt = true
 
 [functions.verify-admin-access]
 verify_jwt = true
+
+[functions.generate-video-project]
+verify_jwt = true
+
+[functions.generate-scene-visuals]
+verify_jwt = true
+
+[functions.generate-scene-audio]
+verify_jwt = true
+
+[functions.get-video-projects]
+verify_jwt = true

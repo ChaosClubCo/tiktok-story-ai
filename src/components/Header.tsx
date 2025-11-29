@@ -1,7 +1,7 @@
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { LogOut, FileText } from "lucide-react";
+import { LogOut, FileText, Film } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate, useLocation } from "react-router-dom";
 
@@ -79,6 +79,15 @@ export const Header = () => {
               className={location.pathname === '/series' ? 'bg-primary/10 text-primary' : ''}
             >
               Series
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => navigate("/video-generator")}
+              className={`flex items-center gap-2 ${location.pathname === '/video-generator' || location.pathname.startsWith('/video-editor') ? 'bg-primary/10 text-primary' : ''}`}
+            >
+              <Film className="h-4 w-4" />
+              Videos
             </Button>
             <Button
               variant="ghost"
