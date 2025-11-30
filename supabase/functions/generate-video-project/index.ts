@@ -76,9 +76,13 @@ serve(async (req) => {
       project_id: project.id,
       sequence_order: index + 1,
       script_segment: segment.trim(),
-      visual_prompt: generateVisualPrompt(segment.trim(), index),
+      visual_prompt: generateVisualPrompt(segment.trim(), index, settings),
       duration_seconds: calculateDuration(segment.trim()),
-      status: 'pending'
+      status: 'pending',
+      settings: {
+        transitionType: settings?.transitionType || 'fade',
+        transitionDuration: settings?.transitionDuration || 0.5,
+      }
     }));
 
     const { error: scenesError } = await supabaseAdmin
@@ -115,11 +119,13 @@ serve(async (req) => {
   }
 });
 
-function generateVisualPrompt(scriptSegment: string, index: number): string {
+function generateVisualPrompt(scriptSegment: string, index: number, templateSettings?: any): string {
   // Extract key visual elements from the script segment
   const words = scriptSegment.toLowerCase();
   
-  let style = "cinematic, dramatic lighting, high quality";
+  // Start with template visual style if provided
+  let style = templateSettings?.visualStyle || "cinematic, dramatic lighting, high quality";
+  let colorGrading = templateSettings?.colorGrading || "";
   let subject = "";
   
   // Simple keyword detection for visual generation
@@ -141,7 +147,9 @@ function generateVisualPrompt(scriptSegment: string, index: number): string {
     subject = "abstract concept visualization";
   }
   
-  return `${subject}, ${style}, scene ${index + 1}`;
+  // Combine all elements
+  const prompt = `${subject}, ${style}${colorGrading ? ', ' + colorGrading : ''}, scene ${index + 1}`;
+  return prompt;
 }
 
 function calculateDuration(segment: string): number {

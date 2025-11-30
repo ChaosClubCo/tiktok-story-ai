@@ -122,17 +122,14 @@ export function useVideoGeneration() {
     }
   };
 
-  const generateAllScenes = async (projectId: string) => {
+  const generateAllScenes = async (projectId: string, concurrency: number = 3) => {
     setLoading(true);
     setProgress(30);
 
     try {
       // Fetch project and scenes
       const { data: projectData } = await supabase.functions.invoke('get-video-projects', {
-        body: {},
-        headers: {
-          'Content-Type': 'application/json'
-        }
+        body: { projectId },
       });
 
       if (!projectData?.project) {
@@ -141,36 +138,46 @@ export function useVideoGeneration() {
 
       const scenes = projectData.project.scenes || [];
       const totalScenes = scenes.length;
+      const pendingScenes = scenes.filter((s: any) => s.status !== 'completed');
 
       toast({
         title: "Starting generation",
-        description: `Generating ${totalScenes} scenes...`,
+        description: `Generating ${pendingScenes.length} scenes with ${concurrency}x parallelization...`,
       });
 
       let completed = 0;
 
-      // Generate visuals and audio for each scene sequentially
-      for (const scene of scenes) {
-        if (scene.status === 'completed') {
-          completed++;
-          continue;
-        }
-
-        // Generate visual
-        const visualSuccess = await generateSceneVisuals(scene.id);
-        if (visualSuccess) {
-          completed++;
-          setProgress(30 + (completed / totalScenes) * 35);
-          
-          // Generate audio
-          const audioSuccess = await generateSceneAudio(scene.id);
-          if (audioSuccess) {
-            setProgress(30 + (completed / totalScenes) * 70);
+      // Parallel batch processing with concurrency limit
+      const processBatch = async (batch: any[]) => {
+        const promises = batch.map(async (scene) => {
+          try {
+            // Generate visual
+            const visualSuccess = await generateSceneVisuals(scene.id);
+            if (visualSuccess) {
+              // Generate audio
+              await generateSceneAudio(scene.id);
+            }
+            completed++;
+            setProgress(30 + (completed / pendingScenes.length) * 70);
+            return true;
+          } catch (error) {
+            console.error(`Failed to generate scene ${scene.id}:`, error);
+            return false;
           }
-        }
+        });
 
-        // Small delay to avoid rate limits
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        return Promise.all(promises);
+      };
+
+      // Process scenes in batches with concurrency limit
+      for (let i = 0; i < pendingScenes.length; i += concurrency) {
+        const batch = pendingScenes.slice(i, i + concurrency);
+        await processBatch(batch);
+        
+        // Small delay between batches to respect rate limits
+        if (i + concurrency < pendingScenes.length) {
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
       }
 
       setProgress(100);

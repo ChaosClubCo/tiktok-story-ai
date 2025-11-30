@@ -34,7 +34,12 @@ export function useVideoAssembler() {
   const { toast } = useToast();
 
   const assembleVideo = useCallback(
-    async (scenes: VideoScene[], projectTitle: string): Promise<boolean> => {
+    async (
+      scenes: VideoScene[], 
+      projectTitle: string,
+      backgroundMusicUrl?: string,
+      musicVolume?: number
+    ): Promise<boolean> => {
       setIsAssembling(true);
       setAssemblyProgress({ stage: 'Preparing', progress: 0 });
 
@@ -61,7 +66,9 @@ export function useVideoAssembler() {
           })),
           (stage, progress) => {
             setAssemblyProgress({ stage, progress });
-          }
+          },
+          backgroundMusicUrl,
+          musicVolume
         );
 
         // Create object URL for preview

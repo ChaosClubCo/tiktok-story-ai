@@ -12,6 +12,7 @@ import { useVideoAssembler } from "@/hooks/useVideoAssembler";
 import { VideoPreviewPlayer } from "@/components/VideoPreviewPlayer";
 import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, Play, Download, Sparkles, Loader2, Image, Music, Film } from "lucide-react";
+import { MUSIC_LIBRARY } from "@/lib/musicLibrary";
 
 export default function VideoEditor() {
   const { projectId } = useParams<{ projectId: string }>();
@@ -48,7 +49,8 @@ export default function VideoEditor() {
   const handleGenerate = async () => {
     if (!projectId) return;
     
-    const success = await generateAllScenes(projectId);
+    // Use parallel batch processing (3x concurrency by default)
+    const success = await generateAllScenes(projectId, 3);
     if (success) {
       await loadProject();
     }
@@ -57,7 +59,19 @@ export default function VideoEditor() {
   const handleRenderVideo = async () => {
     if (!scenes.length) return;
     
-    const success = await assembleVideo(scenes, project?.title || 'video');
+    // Get music settings from project
+    const musicUrl = project?.settings?.musicId 
+      ? MUSIC_LIBRARY.find(m => m.id === project.settings.musicId)?.url 
+      : undefined;
+    const musicVolume = project?.settings?.musicVolume ?? 0.3;
+    
+    const success = await assembleVideo(
+      scenes, 
+      project?.title || 'video', 
+      musicUrl, 
+      musicVolume
+    );
+    
     if (success) {
       toast({
         title: 'Video rendered successfully',

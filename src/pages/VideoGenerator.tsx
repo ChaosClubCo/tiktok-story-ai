@@ -8,6 +8,8 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { VideoProjectCard } from "@/components/VideoProjectCard";
+import { VideoTemplateSelector } from "@/components/VideoTemplateSelector";
+import { MusicSelector } from "@/components/MusicSelector";
 import { useVideoGeneration } from "@/hooks/useVideoGeneration";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -15,6 +17,8 @@ import { Loader2, Film, Plus, Sparkles } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { AuthRequired } from "@/components/shared/AuthRequired";
 import { useAuth } from "@/hooks/useAuth";
+import { VideoTemplate } from "@/lib/videoTemplates";
+import { Separator } from "@/components/ui/separator";
 
 interface Script {
   id: string;
@@ -33,6 +37,9 @@ export default function VideoGenerator() {
   const [description, setDescription] = useState("");
   const [voiceId, setVoiceId] = useState("alloy");
   const [aspectRatio, setAspectRatio] = useState("9:16");
+  const [selectedTemplate, setSelectedTemplate] = useState<VideoTemplate | null>(null);
+  const [selectedMusic, setSelectedMusic] = useState<string>("");
+  const [musicVolume, setMusicVolume] = useState<number>(0.3);
 
   useEffect(() => {
     loadData();
@@ -67,8 +74,13 @@ export default function VideoGenerator() {
       {
         voiceId,
         aspectRatio,
-        transitionStyle: 'fade',
-        musicVolume: 0.3
+        templateId: selectedTemplate?.id,
+        visualStyle: selectedTemplate?.settings.visualStyle,
+        colorGrading: selectedTemplate?.settings.colorGrading,
+        transitionType: selectedTemplate?.settings.transitionType || 'fade',
+        transitionDuration: selectedTemplate?.settings.transitionDuration || 0.5,
+        musicId: selectedMusic,
+        musicVolume: musicVolume,
       }
     );
 
@@ -141,11 +153,46 @@ export default function VideoGenerator() {
             </TabsContent>
 
             <TabsContent value="create" className="space-y-6">
+              {/* Template Selection */}
               <Card>
                 <CardHeader>
-                  <CardTitle>Create Video Project</CardTitle>
+                  <CardTitle>Step 1: Choose Template</CardTitle>
                   <CardDescription>
-                    Select a script and configure your video settings
+                    Select a visual style for your video
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <VideoTemplateSelector
+                    selectedTemplate={selectedTemplate?.id}
+                    onSelectTemplate={setSelectedTemplate}
+                  />
+                </CardContent>
+              </Card>
+
+              {/* Music Selection */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Step 2: Select Music</CardTitle>
+                  <CardDescription>
+                    Add background music to enhance your video
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <MusicSelector
+                    selectedMusic={selectedMusic}
+                    musicVolume={musicVolume}
+                    onSelectMusic={setSelectedMusic}
+                    onVolumeChange={setMusicVolume}
+                  />
+                </CardContent>
+              </Card>
+
+              {/* Project Settings */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Step 3: Project Settings</CardTitle>
+                  <CardDescription>
+                    Configure your video project details
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
