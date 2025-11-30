@@ -163,11 +163,64 @@ export async function concatenateScenes(
 }
 
 /**
- * Main function to generate video from scenes
+ * Add background music to video
+ */
+export async function addBackgroundMusic(
+  ffmpeg: FFmpeg,
+  videoData: Uint8Array,
+  musicUrl: string,
+  musicVolume: number = 0.3,
+  videoDuration: number,
+  onProgress?: (progress: number) => void
+): Promise<Uint8Array> {
+  try {
+    // Write video to virtual filesystem
+    await ffmpeg.writeFile('input.mp4', videoData);
+    
+    // Fetch and write music
+    const musicData = await fetchFile(musicUrl);
+    await ffmpeg.writeFile('music.mp3', musicData);
+
+    // Mix video audio with background music
+    // -stream_loop: loop music to match video duration
+    // -filter_complex: mix audio streams with volume adjustment
+    await ffmpeg.exec([
+      '-i', 'input.mp4',
+      '-stream_loop', '-1',
+      '-i', 'music.mp3',
+      '-filter_complex',
+      `[0:a]volume=1.0[a1];[1:a]volume=${musicVolume}[a2];[a1][a2]amix=inputs=2:duration=first[aout]`,
+      '-map', '0:v',
+      '-map', '[aout]',
+      '-c:v', 'copy',
+      '-c:a', 'aac',
+      '-shortest',
+      'output.mp4',
+    ]);
+
+    // Read output
+    const data = await ffmpeg.readFile('output.mp4');
+
+    // Clean up
+    await ffmpeg.deleteFile('input.mp4');
+    await ffmpeg.deleteFile('music.mp3');
+    await ffmpeg.deleteFile('output.mp4');
+
+    return data as Uint8Array;
+  } catch (error) {
+    console.error('Error adding background music:', error);
+    throw error;
+  }
+}
+
+/**
+ * Main function to generate video from scenes with optional background music
  */
 export async function generateVideoFromScenes(
   scenes: Array<{ imageUrl: string; audioUrl: string }>,
-  onProgress?: (stage: string, progress: number) => void
+  onProgress?: (stage: string, progress: number) => void,
+  backgroundMusicUrl?: string,
+  musicVolume?: number
 ): Promise<Blob> {
   try {
     // Load FFmpeg
@@ -192,8 +245,22 @@ export async function generateVideoFromScenes(
     }
 
     // Concatenate all scenes
-    onProgress?.('Merging scenes', 90);
-    const finalVideo = await concatenateScenes(ffmpeg, sceneVideos);
+    onProgress?.('Merging scenes', 80);
+    let finalVideo = await concatenateScenes(ffmpeg, sceneVideos);
+
+    // Add background music if provided
+    if (backgroundMusicUrl && musicVolume !== undefined) {
+      onProgress?.('Adding background music', 90);
+      const totalDuration = scenes.length * 5; // Approximate total duration
+      finalVideo = await addBackgroundMusic(
+        ffmpeg,
+        finalVideo,
+        backgroundMusicUrl,
+        musicVolume,
+        totalDuration,
+        (p) => onProgress?.('Adding background music', 90 + p * 0.1)
+      );
+    }
 
     // Convert to blob
     onProgress?.('Finalizing video', 100);
