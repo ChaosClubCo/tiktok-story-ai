@@ -226,11 +226,11 @@ const Auth = () => {
       return;
     }
 
-    // Use hardcoded trusted redirect URL instead of dynamic origin
-    const trustedRedirectUrl = "https://zealous-glacier-01b3a5e10.4.azurestaticapps.net/";
+    // Use environment-aware redirect URL for all environments
+    const redirectUrl = `${window.location.origin}/`;
     
     const { error } = await supabase.auth.resetPasswordForEmail(resetEmail, {
-      redirectTo: trustedRedirectUrl,
+      redirectTo: redirectUrl,
     });
 
     if (error) {
