@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { Resend } from "npm:resend@2.0.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { maskEmail, truncateUserId, maskSensitiveData } from "../_shared/piiMasking.ts";
 
 const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
 const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? '';
@@ -35,7 +36,9 @@ const sanitizeInput = (input: string, maxLength: number = 100): string => {
 };
 
 const logStep = (step: string, details?: any) => {
-  const detailsStr = details ? ` - ${JSON.stringify(details)}` : '';
+  // Automatically mask PII in logged details
+  const maskedDetails = details ? maskSensitiveData(details) : undefined;
+  const detailsStr = maskedDetails ? ` - ${JSON.stringify(maskedDetails)}` : '';
   console.log(`[REGISTRATION-EMAIL] ${step}${detailsStr}`);
 };
 
@@ -84,8 +87,8 @@ serve(async (req) => {
     // Verify email matches authenticated user
     if (user.email !== userEmail) {
       logStep("Email mismatch attempt detected", { 
-        authenticatedEmail: user.email, 
-        requestedEmail: userEmail 
+        authenticatedEmail: maskEmail(user.email || ''), 
+        requestedEmail: maskEmail(userEmail) 
       });
       return new Response(
         JSON.stringify({ error: "Email does not match authenticated user" }),
@@ -93,7 +96,7 @@ serve(async (req) => {
       );
     }
 
-    logStep("Email validation passed", { userEmail: user.email });
+    logStep("Email validation passed", { userEmail: maskEmail(user.email || '') });
 
     if (!validateEmail(userEmail)) {
       return new Response(
@@ -109,7 +112,7 @@ serve(async (req) => {
     const sanitizedEmail = sanitizeInput(userEmail, 254);
     const sanitizedDisplayName = sanitizeInput(displayName, 50);
 
-    logStep("Processing registration email", { userEmail: sanitizedEmail, displayName: sanitizedDisplayName });
+    logStep("Processing registration email", { userEmail: maskEmail(sanitizedEmail), displayName: sanitizedDisplayName });
 
     // Get owner email from environment variable
     const ownerEmail = Deno.env.get("OWNER_EMAIL");
