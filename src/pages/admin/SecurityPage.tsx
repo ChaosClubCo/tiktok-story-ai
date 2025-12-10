@@ -8,6 +8,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Shield, AlertTriangle, Activity, Key, RefreshCw, Clock, TrendingUp, Lock } from 'lucide-react';
 import { SecurityIndicator } from '@/components/SecurityIndicator';
 import { ApiKeyRotation } from '@/components/admin/ApiKeyRotation';
+import { Admin2FASettings } from '@/components/admin/Admin2FASettings';
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner';
 
 interface SecurityEvent {
@@ -186,6 +187,7 @@ export const SecurityPage = () => {
       <Tabs defaultValue="events" className="space-y-4">
         <TabsList>
           <TabsTrigger value="events">Security Events</TabsTrigger>
+          <TabsTrigger value="2fa">Two-Factor Auth</TabsTrigger>
           <TabsTrigger value="keys">API Key Rotation</TabsTrigger>
           <TabsTrigger value="headers">Security Headers</TabsTrigger>
         </TabsList>
@@ -230,6 +232,10 @@ export const SecurityPage = () => {
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="2fa">
+          <Admin2FASettings />
         </TabsContent>
 
         <TabsContent value="keys">

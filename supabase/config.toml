@@ -66,3 +66,6 @@ verify_jwt = true
 
 [functions.ai-generate]
 verify_jwt = true
+
+[functions.admin-2fa]
+verify_jwt = true
