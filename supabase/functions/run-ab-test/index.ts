@@ -1,9 +1,16 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { truncateUserId, maskSensitiveData } from '../_shared/piiMasking.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
+const logStep = (step: string, details?: any) => {
+  const maskedDetails = details ? maskSensitiveData(details) : undefined;
+  const detailsStr = maskedDetails ? ` - ${JSON.stringify(maskedDetails)}` : '';
+  console.log(`[RUN-AB-TEST] ${step}${detailsStr}`);
 };
 
 serve(async (req) => {
