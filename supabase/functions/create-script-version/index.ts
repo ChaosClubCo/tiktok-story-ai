@@ -1,9 +1,15 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { truncateUserId } from "../_shared/piiMasking.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
+const logStep = (step: string, details?: any) => {
+  const detailsStr = details ? ` - ${JSON.stringify(details)}` : '';
+  console.log(`[CREATE-SCRIPT-VERSION] ${step}${detailsStr}`);
 };
 
 serve(async (req) => {
@@ -12,6 +18,7 @@ serve(async (req) => {
   }
 
   try {
+    logStep("Function started");
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? ''
@@ -35,8 +42,11 @@ serve(async (req) => {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
+    logStep("User authenticated", { userId: truncateUserId(user.id) });
 
     const { scriptId, changeDescription } = await req.json();
+
+    logStep("Processing request", { scriptId, hasChangeDescription: !!changeDescription });
 
     if (!scriptId) {
       return new Response(JSON.stringify({ error: 'scriptId is required' }), {
@@ -90,7 +100,7 @@ serve(async (req) => {
       .single();
 
     if (versionError) {
-      console.error('Error creating version:', versionError);
+      logStep("ERROR creating version", { error: versionError.message });
       return new Response(JSON.stringify({ error: 'Failed to create version' }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -107,8 +117,10 @@ serve(async (req) => {
       .eq('id', scriptId);
 
     if (updateError) {
-      console.error('Error updating script version:', updateError);
+      logStep("Warning: Error updating script version", { error: updateError.message });
     }
+
+    logStep("Version created successfully", { versionId: newVersion.id, versionNumber: newVersionNumber });
 
     return new Response(JSON.stringify({ 
       success: true,
@@ -118,7 +130,7 @@ serve(async (req) => {
     });
 
   } catch (error) {
-    console.error('Error in create-script-version:', error);
+    logStep("ERROR in create-script-version", { message: error.message });
     return new Response(JSON.stringify({ error: error.message }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

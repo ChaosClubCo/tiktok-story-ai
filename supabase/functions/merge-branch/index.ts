@@ -1,9 +1,15 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { truncateUserId } from "../_shared/piiMasking.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
+const logStep = (step: string, details?: any) => {
+  const detailsStr = details ? ` - ${JSON.stringify(details)}` : '';
+  console.log(`[MERGE-BRANCH] ${step}${detailsStr}`);
 };
 
 serve(async (req) => {
@@ -26,12 +32,14 @@ serve(async (req) => {
     if (userError || !user) {
       throw new Error('Unauthorized');
     }
+    logStep("User authenticated", { userId: truncateUserId(user.id) });
 
     const { branchId, scriptId } = await req.json();
 
     if (!branchId || !scriptId) {
       throw new Error('Invalid request: branchId and scriptId required');
     }
+    logStep("Processing merge request", { branchId, scriptId });
 
     // Get branch details
     const { data: branch, error: branchError } = await supabaseClient
@@ -97,6 +105,8 @@ serve(async (req) => {
 
     if (branchUpdateError) throw branchUpdateError;
 
+    logStep("Branch merged successfully", { newVersionId: newVersion.id });
+
     return new Response(
       JSON.stringify({
         success: true,
@@ -107,7 +117,7 @@ serve(async (req) => {
       }
     );
   } catch (error) {
-    console.error('Error in merge-branch:', error);
+    logStep("ERROR in merge-branch", { message: error.message });
     return new Response(
       JSON.stringify({ error: error.message }),
       {

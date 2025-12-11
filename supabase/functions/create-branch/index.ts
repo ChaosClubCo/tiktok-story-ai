@@ -1,9 +1,15 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { truncateUserId } from "../_shared/piiMasking.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
+const logStep = (step: string, details?: any) => {
+  const detailsStr = details ? ` - ${JSON.stringify(details)}` : '';
+  console.log(`[CREATE-BRANCH] ${step}${detailsStr}`);
 };
 
 serve(async (req) => {
@@ -26,8 +32,10 @@ serve(async (req) => {
     if (userError || !user) {
       throw new Error('Unauthorized');
     }
+    logStep("User authenticated", { userId: truncateUserId(user.id) });
 
     const { scriptId, branchName, description } = await req.json();
+    logStep("Creating branch", { scriptId, branchName });
 
     if (!scriptId || !branchName) {
       throw new Error('Invalid request: scriptId and branchName required');
@@ -72,6 +80,7 @@ serve(async (req) => {
       .single();
 
     if (branchError) throw branchError;
+    logStep("Branch created successfully", { branchId: branch.id });
 
     return new Response(
       JSON.stringify({
@@ -83,7 +92,7 @@ serve(async (req) => {
       }
     );
   } catch (error) {
-    console.error('Error in create-branch:', error);
+    logStep("ERROR in create-branch", { message: error.message });
     return new Response(
       JSON.stringify({ error: error.message }),
       {
