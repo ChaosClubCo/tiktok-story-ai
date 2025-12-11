@@ -1,9 +1,15 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { truncateUserId } from "../_shared/piiMasking.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
+const logStep = (step: string, details?: any) => {
+  const detailsStr = details ? ` - ${JSON.stringify(details)}` : '';
+  console.log(`[GENERATE-VIDEO-PROJECT] ${step}${detailsStr}`);
 };
 
 serve(async (req) => {
@@ -12,6 +18,7 @@ serve(async (req) => {
   }
 
   try {
+    logStep("Function started");
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
       throw new Error('Missing authorization header');
@@ -28,8 +35,10 @@ serve(async (req) => {
     if (authError || !user) {
       throw new Error('Unauthorized');
     }
+    logStep("User authenticated", { userId: truncateUserId(user.id) });
 
     const { scriptId, title, description, settings } = await req.json();
+    logStep("Processing request", { scriptId, title });
 
     if (!scriptId || !title) {
       throw new Error('Script ID and title are required');
@@ -93,7 +102,7 @@ serve(async (req) => {
       throw new Error(`Failed to create scenes: ${scenesError.message}`);
     }
 
-    console.log(`Created video project ${project.id} with ${scenes.length} scenes`);
+    logStep("Video project created successfully", { projectId: project.id, sceneCount: scenes.length });
 
     return new Response(
       JSON.stringify({ 
@@ -108,7 +117,7 @@ serve(async (req) => {
     );
 
   } catch (error) {
-    console.error('Error in generate-video-project:', error);
+    logStep("ERROR in generate-video-project", { message: error.message });
     return new Response(
       JSON.stringify({ error: error.message }),
       { 

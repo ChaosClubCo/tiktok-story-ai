@@ -1,9 +1,15 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { truncateUserId } from "../_shared/piiMasking.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
+const logStep = (step: string, details?: any) => {
+  const detailsStr = details ? ` - ${JSON.stringify(details)}` : '';
+  console.log(`[GET-VIDEO-PROJECTS] ${step}${detailsStr}`);
 };
 
 serve(async (req) => {
@@ -12,6 +18,7 @@ serve(async (req) => {
   }
 
   try {
+    logStep("Function started");
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
       throw new Error('Missing authorization header');
@@ -28,6 +35,7 @@ serve(async (req) => {
     if (authError || !user) {
       throw new Error('Unauthorized');
     }
+    logStep("User authenticated", { userId: truncateUserId(user.id) });
 
     const url = new URL(req.url);
     const projectId = url.searchParams.get('projectId');
@@ -48,6 +56,7 @@ serve(async (req) => {
       if (projectError) {
         throw new Error(`Project not found: ${projectError.message}`);
       }
+      logStep("Single project retrieved", { projectId });
 
       return new Response(
         JSON.stringify({ project }),
@@ -71,6 +80,7 @@ serve(async (req) => {
       if (projectsError) {
         throw new Error(`Failed to fetch projects: ${projectsError.message}`);
       }
+      logStep("Projects retrieved", { count: projects?.length || 0 });
 
       return new Response(
         JSON.stringify({ projects }),
@@ -82,7 +92,7 @@ serve(async (req) => {
     }
 
   } catch (error) {
-    console.error('Error in get-video-projects:', error);
+    logStep("ERROR in get-video-projects", { message: error.message });
     return new Response(
       JSON.stringify({ error: error.message }),
       { 

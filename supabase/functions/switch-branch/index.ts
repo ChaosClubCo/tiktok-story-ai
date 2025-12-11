@@ -1,9 +1,15 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { truncateUserId } from "../_shared/piiMasking.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
+const logStep = (step: string, details?: any) => {
+  const detailsStr = details ? ` - ${JSON.stringify(details)}` : '';
+  console.log(`[SWITCH-BRANCH] ${step}${detailsStr}`);
 };
 
 serve(async (req) => {
@@ -26,12 +32,14 @@ serve(async (req) => {
     if (userError || !user) {
       throw new Error('Unauthorized');
     }
+    logStep("User authenticated", { userId: truncateUserId(user.id) });
 
     const { scriptId, branchId } = await req.json();
 
     if (!scriptId || !branchId) {
       throw new Error('Invalid request: scriptId and branchId required');
     }
+    logStep("Switching branch", { scriptId, branchId });
 
     // Update active branch in scripts table
     const { error: updateError } = await supabaseClient
@@ -52,6 +60,7 @@ serve(async (req) => {
       .single();
 
     if (branchError) throw branchError;
+    logStep("Branch switched successfully", { branchName: branch.branch_name });
 
     return new Response(
       JSON.stringify({
@@ -63,7 +72,7 @@ serve(async (req) => {
       }
     );
   } catch (error) {
-    console.error('Error in switch-branch:', error);
+    logStep("ERROR in switch-branch", { message: error.message });
     return new Response(
       JSON.stringify({ error: error.message }),
       {

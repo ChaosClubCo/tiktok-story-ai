@@ -115,7 +115,7 @@ function testNoEval() {
   }
 }
 
-// Test 3: PII masking in edge functions
+// Test 3: PII masking in edge functions (comprehensive coverage)
 function testPIIMasking() {
   const testName = 'PII masking in edge functions';
   
@@ -124,24 +124,54 @@ function testPIIMasking() {
     return;
   }
   
-  // Check critical edge functions
+  // Check ALL edge functions that handle user data
   const criticalFunctions = [
+    // Authentication & Admin
     'verify-admin-access',
+    'admin-2fa',
+    'admin-get-users',
+    'admin-get-content',
+    // Payment
+    'check-subscription',
     'create-checkout',
     'customer-portal',
+    // User content
     'send-registration-email',
     'save-script',
     'get-user-scripts',
-    'analyze-script'
+    'analyze-script',
+    'generate-script',
+    // Version control
+    'create-branch',
+    'merge-branch',
+    'switch-branch',
+    'create-script-version',
+    // A/B Testing
+    'run-ab-test',
+    'complete-ab-test',
+    // Video generation
+    'generate-video-project',
+    'get-video-projects',
+    // Series
+    'generate-series',
+    'fetch-trends'
   ];
   
   const missing = [];
+  const piiPatterns = [
+    'maskEmail',
+    'maskUserInfo',
+    'truncateUserId',
+    'maskSensitiveData',
+    'piiMasking'
+  ];
   
   for (const func of criticalFunctions) {
     const funcPath = path.join('supabase/functions', func, 'index.ts');
     if (fs.existsSync(funcPath)) {
       const content = fs.readFileSync(funcPath, 'utf8');
-      if (!content.includes('maskEmail') && !content.includes('maskUserInfo') && !content.includes('truncateUserId')) {
+      const hasPIIMasking = piiPatterns.some(pattern => content.includes(pattern));
+      if (!hasPIIMasking) {
         missing.push(func);
       }
     }
@@ -332,6 +362,121 @@ function testNoRawSQL() {
   }
 }
 
+// Test 11: Admin 2FA implementation
+function testAdmin2FA() {
+  const testName = 'Admin 2FA implementation';
+  
+  const requiredFiles = [
+    'supabase/functions/admin-2fa/index.ts',
+    'src/hooks/useAdmin2FA.tsx',
+    'src/components/admin/Admin2FASettings.tsx'
+  ];
+  
+  const missing = requiredFiles.filter(f => !fs.existsSync(f));
+  
+  if (missing.length === 0) {
+    // Verify TOTP functionality
+    const admin2faContent = fs.readFileSync('supabase/functions/admin-2fa/index.ts', 'utf8');
+    const requiredFeatures = ['setup', 'verify', 'backup_codes', 'disable'];
+    const missingFeatures = requiredFeatures.filter(f => !admin2faContent.toLowerCase().includes(f));
+    
+    if (missingFeatures.length === 0) {
+      pass(testName);
+    } else {
+      fail(testName, `Missing 2FA features: ${missingFeatures.join(', ')}`);
+    }
+  } else {
+    fail(testName, `Missing 2FA files: ${missing.join(', ')}`);
+  }
+}
+
+// Test 12: Security definer functions for RLS
+function testSecurityDefinerFunctions() {
+  const testName = 'Security definer functions';
+  
+  // Check for has_role function usage in edge functions
+  const adminFunctions = ['verify-admin-access', 'admin-get-users', 'admin-get-content'];
+  let hasSecurityDefiner = false;
+  
+  for (const func of adminFunctions) {
+    const funcPath = path.join('supabase/functions', func, 'index.ts');
+    if (fs.existsSync(funcPath)) {
+      const content = fs.readFileSync(funcPath, 'utf8');
+      if (content.includes('has_role') || content.includes('is_admin')) {
+        hasSecurityDefiner = true;
+        break;
+      }
+    }
+  }
+  
+  if (hasSecurityDefiner) {
+    pass(testName);
+  } else {
+    warn(testName, 'Security definer functions not found in admin edge functions');
+  }
+}
+
+// Test 13: Structured logging in edge functions
+function testStructuredLogging() {
+  const testName = 'Structured logging in edge functions';
+  
+  const functionsDir = 'supabase/functions';
+  const functions = fs.readdirSync(functionsDir)
+    .filter(f => fs.statSync(path.join(functionsDir, f)).isDirectory())
+    .filter(f => f !== '_shared');
+  
+  const withoutLogging = [];
+  
+  for (const func of functions) {
+    const funcPath = path.join(functionsDir, func, 'index.ts');
+    if (fs.existsSync(funcPath)) {
+      const content = fs.readFileSync(funcPath, 'utf8');
+      // Check for structured logging pattern
+      if (!content.includes('logStep') && !content.includes('console.log(`[')) {
+        withoutLogging.push(func);
+      }
+    }
+  }
+  
+  if (withoutLogging.length <= 3) {  // Allow some tolerance
+    pass(testName);
+  } else {
+    warn(testName, `Edge functions without structured logging: ${withoutLogging.join(', ')}`);
+  }
+}
+
+// Test 14: Auth header validation in edge functions  
+function testAuthHeaderValidation() {
+  const testName = 'Auth header validation';
+  
+  const functionsDir = 'supabase/functions';
+  const functions = fs.readdirSync(functionsDir)
+    .filter(f => fs.statSync(path.join(functionsDir, f)).isDirectory())
+    .filter(f => f !== '_shared' && f !== 'demo-viral-score' && f !== 'security-headers');
+  
+  const missingAuth = [];
+  
+  for (const func of functions) {
+    const funcPath = path.join(functionsDir, func, 'index.ts');
+    if (fs.existsSync(funcPath)) {
+      const content = fs.readFileSync(funcPath, 'utf8');
+      // Check for auth validation patterns
+      const hasAuth = content.includes('Authorization') || 
+                      content.includes('getUser') ||
+                      content.includes('verify_jwt');
+      if (!hasAuth) {
+        missingAuth.push(func);
+      }
+    }
+  }
+  
+  if (missingAuth.length === 0) {
+    pass(testName);
+  } else {
+    fail(testName, `Missing auth validation in: ${missingAuth.join(', ')}`);
+  }
+}
+
 // Main test runner
 async function runTests() {
   log('\n' + '='.repeat(60), colors.bold);
@@ -349,6 +494,10 @@ async function runTests() {
   testSecurityHeaders();
   testRateLimiting();
   testNoRawSQL();
+  testAdmin2FA();
+  testSecurityDefinerFunctions();
+  testStructuredLogging();
+  testAuthHeaderValidation();
   
   // Summary
   log('\n' + '='.repeat(60), colors.bold);

@@ -1,9 +1,15 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { truncateUserId } from "../_shared/piiMasking.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
+const logStep = (step: string, details?: any) => {
+  const detailsStr = details ? ` - ${JSON.stringify(details)}` : '';
+  console.log(`[COMPLETE-AB-TEST] ${step}${detailsStr}`);
 };
 
 serve(async (req) => {
@@ -26,12 +32,14 @@ serve(async (req) => {
     if (userError || !user) {
       throw new Error('Unauthorized');
     }
+    logStep("User authenticated", { userId: truncateUserId(user.id) });
 
     const { testId, winnerId } = await req.json();
 
     if (!testId || !winnerId) {
       throw new Error('Invalid request: testId and winnerId required');
     }
+    logStep("Completing A/B test", { testId, winnerId });
 
     // Update test record
     const { data: test, error: testError } = await supabaseClient
@@ -47,6 +55,7 @@ serve(async (req) => {
       .single();
 
     if (testError) throw testError;
+    logStep("A/B test completed successfully", { testId: test.id });
 
     return new Response(
       JSON.stringify({
@@ -58,7 +67,7 @@ serve(async (req) => {
       }
     );
   } catch (error) {
-    console.error('Error in complete-ab-test:', error);
+    logStep("ERROR in complete-ab-test", { message: error.message });
     return new Response(
       JSON.stringify({ error: error.message }),
       {
