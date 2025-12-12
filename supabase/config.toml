@@ -23,7 +23,7 @@ verify_jwt = false
 verify_jwt = true
 
 [functions.send-registration-email]
-verify_jwt = true
+verify_jwt = false
 
 [functions.security-headers]
 verify_jwt = false
