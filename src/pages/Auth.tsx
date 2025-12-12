@@ -114,26 +114,21 @@ const Auth = () => {
         variant: "destructive",
       });
     } else {
-      // Send registration notification email
-      if (data.user) {
-        try {
-          await supabase.functions.invoke('send-registration-email', {
-            body: {
-              userEmail: email,
-              displayName: data.user.user_metadata?.display_name || 'New User'
-            }
-          });
-        } catch (emailError) {
-          console.error('Failed to send registration email:', emailError);
-        }
-      }
-
       monitorAuthAttempts(email, true);
       
-      toast({
-        title: "Account Created!",
-        description: "You can now sign in with your credentials",
-      });
+      // Check if email confirmation is required
+      if (data.user && !data.session) {
+        toast({
+          title: "Check Your Email!",
+          description: "We've sent you a confirmation link. Please check your inbox and click the link to activate your account.",
+        });
+      } else {
+        toast({
+          title: "Account Created!",
+          description: "You have been signed in successfully.",
+        });
+        navigate("/");
+      }
       setEmail("");
       setPassword("");
     }
