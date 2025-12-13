@@ -939,14 +939,39 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      has_role: {
-        Args: {
-          _role: Database["public"]["Enums"]["app_role"]
-          _user_id: string
-        }
-        Returns: boolean
-      }
+      ab_test_owner_id: { Args: { p_test: string }; Returns: string }
+      has_role:
+        | {
+            Args: {
+              _role: Database["public"]["Enums"]["app_role"]
+              _user_id: string
+            }
+            Returns: boolean
+          }
+        | { Args: { target_role: string }; Returns: boolean }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
+      is_super_admin: { Args: never; Returns: boolean }
+      log_admin_action: {
+        Args: {
+          p_action: string
+          p_metadata?: Json
+          p_reason?: string
+          p_resource_id: string
+          p_resource_type: string
+        }
+        Returns: undefined
+      }
+      moderator_log: {
+        Args: {
+          p_action: string
+          p_metadata?: Json
+          p_reason?: string
+          p_resource_id: string
+          p_resource_type: string
+        }
+        Returns: undefined
+      }
+      project_owner_id: { Args: { p_project: string }; Returns: string }
     }
     Enums: {
       app_role: "super_admin" | "support_admin" | "content_moderator" | "user"
