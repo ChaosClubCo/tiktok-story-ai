@@ -2,7 +2,7 @@ import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { truncateUserId, maskSensitiveData } from "../_shared/piiMasking.ts";
 import { corsHeaders } from "../_shared/corsHeaders.ts";
-import { authenticateRequest } from "../_shared/authHelpers.ts";
+import { logServiceRoleOperation } from "../_shared/serviceRoleAudit.ts";
 
 // TOTP implementation using Web Crypto API
 const BASE32_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
@@ -206,6 +206,17 @@ serve(async (req) => {
         
         if (insertError) throw insertError;
         
+        // Log service role operation for 2FA setup
+        await logServiceRoleOperation(supabase, req, {
+          operation: '2fa_setup',
+          table: 'admin_totp',
+          action: 'upsert',
+          userId: user.id,
+          targetUserId: user.id,
+          metadata: { action: 'setup_initiated' },
+          success: true,
+        });
+        
         // Log attempt
         await supabase.from('admin_2fa_attempts').insert({
           user_id: user.id,
@@ -287,6 +298,17 @@ serve(async (req) => {
             verified_at: new Date().toISOString()
           })
           .eq('user_id', user.id);
+        
+        // Log service role operation for 2FA enable
+        await logServiceRoleOperation(supabase, req, {
+          operation: '2fa_enable',
+          table: 'admin_totp',
+          action: 'update',
+          userId: user.id,
+          targetUserId: user.id,
+          metadata: { action: '2fa_enabled' },
+          success: true,
+        });
         
         logStep('2FA enabled successfully', { userId: truncateUserId(user.id) });
         
@@ -454,6 +476,17 @@ serve(async (req) => {
           .from('admin_totp')
           .delete()
           .eq('user_id', user.id);
+        
+        // Log service role operation for 2FA disable
+        await logServiceRoleOperation(supabase, req, {
+          operation: '2fa_disable',
+          table: 'admin_totp',
+          action: 'delete',
+          userId: user.id,
+          targetUserId: user.id,
+          metadata: { action: '2fa_disabled' },
+          success: true,
+        });
         
         logStep('2FA disabled', { userId: truncateUserId(user.id) });
         

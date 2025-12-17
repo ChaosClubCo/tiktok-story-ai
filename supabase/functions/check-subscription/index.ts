@@ -1,7 +1,8 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@14.21.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
-import { maskUserInfo, maskSensitiveData } from "../_shared/piiMasking.ts";
+import { maskUserInfo, maskSensitiveData, truncateUserId } from "../_shared/piiMasking.ts";
+import { logServiceRoleOperation } from "../_shared/serviceRoleAudit.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -9,7 +10,6 @@ const corsHeaders = {
 };
 
 const logStep = (step: string, details?: any) => {
-  // Automatically mask PII in logged details
   const maskedDetails = details ? maskSensitiveData(details) : undefined;
   const detailsStr = maskedDetails ? ` - ${JSON.stringify(maskedDetails)}` : '';
   console.log(`[CHECK-SUBSCRIPTION] ${step}${detailsStr}`);
@@ -61,7 +61,7 @@ serve(async (req) => {
     
     if (customers.data.length === 0) {
       logStep("No customer found, updating unsubscribed state");
-      await supabaseClient.from("subscribers").upsert({
+      const { error: upsertError } = await supabaseClient.from("subscribers").upsert({
         email: user.email,
         user_id: user.id,
         stripe_customer_id: null,
@@ -70,6 +70,19 @@ serve(async (req) => {
         subscription_end: null,
         updated_at: new Date().toISOString(),
       }, { onConflict: 'email' });
+
+      // Log service role operation
+      await logServiceRoleOperation(supabaseClient, req, {
+        operation: 'check_subscription',
+        table: 'subscribers',
+        action: 'upsert',
+        userId: user.id,
+        targetUserId: user.id,
+        metadata: { subscribed: false, reason: 'no_stripe_customer' },
+        success: !upsertError,
+        errorMessage: upsertError?.message,
+      });
+
       return new Response(JSON.stringify({ subscribed: false }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 200,
@@ -111,7 +124,7 @@ serve(async (req) => {
       logStep("No active subscription found");
     }
 
-    await supabaseClient.from("subscribers").upsert({
+    const { error: upsertError } = await supabaseClient.from("subscribers").upsert({
       email: user.email,
       user_id: user.id,
       stripe_customer_id: customerId,
@@ -120,6 +133,22 @@ serve(async (req) => {
       subscription_end: subscriptionEnd,
       updated_at: new Date().toISOString(),
     }, { onConflict: 'email' });
+
+    // Log service role operation for subscription update
+    await logServiceRoleOperation(supabaseClient, req, {
+      operation: 'check_subscription',
+      table: 'subscribers',
+      action: 'upsert',
+      userId: user.id,
+      targetUserId: user.id,
+      metadata: { 
+        subscribed: hasActiveSub, 
+        subscriptionTier,
+        stripeCustomerId: customerId,
+      },
+      success: !upsertError,
+      errorMessage: upsertError?.message,
+    });
 
     logStep("Updated database with subscription info", { subscribed: hasActiveSub, subscriptionTier });
     return new Response(JSON.stringify({
