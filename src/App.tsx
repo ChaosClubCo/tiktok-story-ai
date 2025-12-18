@@ -18,6 +18,7 @@ import Series from "./pages/Series";
 import SeriesBuilder from "./pages/SeriesBuilder";
 import VideoGenerator from "./pages/VideoGenerator";
 import VideoEditor from "./pages/VideoEditor";
+import ABTests from "./pages/ABTests";
 import NotFound from "./pages/NotFound";
 import Install from "./pages/Install";
 import { AdminLayout } from "./pages/admin/AdminLayout";
@@ -49,6 +50,7 @@ const App = () => {
                 <Route path="/series/builder" element={<SeriesBuilder />} />
                 <Route path="/video-generator" element={<VideoGenerator />} />
                 <Route path="/video-editor/:projectId" element={<VideoEditor />} />
+                <Route path="/ab-tests" element={<ABTests />} />
                 <Route path="/auth" element={<Auth />} />
                 <Route path="/my-scripts" element={<MyScripts />} />
                 <Route path="/admin" element={<AdminLayout />}>
