@@ -11,6 +11,7 @@ import { AnalyticsTrendChart } from "@/components/analytics/AnalyticsTrendChart"
 import { AnalyticsRadarChart } from "@/components/analytics/AnalyticsRadarChart";
 import { AnalyticsNichePerformance } from "@/components/analytics/AnalyticsNichePerformance";
 import { AnalyticsTopScripts } from "@/components/analytics/AnalyticsTopScripts";
+import { AnalyticsExport } from "@/components/analytics/AnalyticsExport";
 import { useAnalyticsData } from "@/hooks/useAnalyticsData";
 import {
   calculateImprovementRate,
@@ -81,31 +82,35 @@ const Analytics = () => {
             </p>
           </div>
 
-          <div className="flex flex-wrap gap-4 mb-8">
-            <Select value={timeRange} onValueChange={setTimeRange}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Time range" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="7d">Last 7 days</SelectItem>
-                <SelectItem value="30d">Last 30 days</SelectItem>
-                <SelectItem value="90d">Last 90 days</SelectItem>
-                <SelectItem value="1y">Last year</SelectItem>
-                <SelectItem value="all">All time</SelectItem>
-              </SelectContent>
-            </Select>
+          <div className="flex flex-wrap gap-4 mb-8 justify-between">
+            <div className="flex flex-wrap gap-4">
+              <Select value={timeRange} onValueChange={setTimeRange}>
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="Time range" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="7d">Last 7 days</SelectItem>
+                  <SelectItem value="30d">Last 30 days</SelectItem>
+                  <SelectItem value="90d">Last 90 days</SelectItem>
+                  <SelectItem value="1y">Last year</SelectItem>
+                  <SelectItem value="all">All time</SelectItem>
+                </SelectContent>
+              </Select>
 
-            <Select value={nicheFilter} onValueChange={setNicheFilter}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Filter by niche" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All niches</SelectItem>
-                {uniqueNiches.map(niche => (
-                  <SelectItem key={niche} value={niche!}>{niche}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              <Select value={nicheFilter} onValueChange={setNicheFilter}>
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="Filter by niche" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All niches</SelectItem>
+                  {uniqueNiches.map(niche => (
+                    <SelectItem key={niche} value={niche!}>{niche}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <AnalyticsExport predictions={filteredPredictions} timeRange={timeRange} />
           </div>
 
           <AnalyticsOverviewCards
