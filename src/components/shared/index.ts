@@ -11,3 +11,4 @@ export { MobileNav, type NavItem } from './MobileNav';
 export { RouteErrorBoundary } from './RouteErrorBoundary';
 export { PrefetchLink } from './PrefetchLink';
 export { SkipLink, SkipLinks } from './SkipLink';
+export { ErrorBoundary } from './ErrorBoundary';
