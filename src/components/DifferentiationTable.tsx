@@ -3,14 +3,15 @@ import { motion } from "framer-motion";
 
 export const DifferentiationTable = () => {
   const features = [
-    { name: "Single Script Generation", others: true, us: true },
-    { name: "Series Generation (5-10 Episodes)", others: false, us: true },
-    { name: "Real-Time Trend Integration", others: false, us: true },
-    { name: "Viral Prediction Engine", others: false, us: true },
-    { name: "Team Collaboration", others: false, us: true },
-    { name: "Visual Hook Generation", others: false, us: true },
-    { name: "POV Template Library", others: false, us: true },
-    { name: "Multi-Platform Adaptation", others: false, us: true },
+    { name: "Single Script Generation", others: true, us: true, description: "Basic capability" },
+    { name: "Complete Series (5-10 Episodes)", others: false, us: true, description: "Connected storylines" },
+    { name: "Real-Time Trend Integration", others: false, us: true, description: "Tap into what's viral now" },
+    { name: "AI Viral Score Prediction", others: false, us: true, description: "Know before you post" },
+    { name: "Team Collaboration Studio", others: false, us: true, description: "Built for creator teams" },
+    { name: "Visual Hook Generation", others: false, us: true, description: "Eye-catching openers" },
+    { name: "15+ POV Templates", others: false, us: true, description: "Proven viral formats" },
+    { name: "Multi-Platform Optimization", others: false, us: true, description: "TikTok, Reels, Shorts" },
+    { name: "A/B Test Your Scripts", others: false, us: true, description: "Data-driven content" },
   ];
 
   return (
@@ -23,11 +24,15 @@ export const DifferentiationTable = () => {
           transition={{ duration: 0.6 }}
           className="text-center mb-12"
         >
-          <h2 className="text-3xl sm:text-4xl font-bold mb-4 bg-gradient-drama bg-clip-text text-transparent">
-            Why Creators Choose MiniDrama
+          <span className="text-primary font-semibold text-sm uppercase tracking-wider">
+            The MiniDrama Difference
+          </span>
+          <h2 className="text-3xl sm:text-4xl font-bold mt-3 mb-4">
+            Why 30,000+ Creators{' '}
+            <span className="bg-gradient-drama bg-clip-text text-transparent">Switched to MiniDrama</span>
           </h2>
           <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
-            We're not just another script generator. We're your complete content empire builder.
+            Other tools generate scripts. We build content empires with serialized storytelling.
           </p>
         </motion.div>
 
@@ -64,7 +69,10 @@ export const DifferentiationTable = () => {
                     transition={{ duration: 0.4, delay: index * 0.05 }}
                     className="border-b border-border/50 hover:bg-muted/20 transition-colors"
                   >
-                    <td className="p-6 text-foreground">{feature.name}</td>
+                    <td className="p-6">
+                      <span className="text-foreground">{feature.name}</span>
+                      <span className="block text-xs text-muted-foreground mt-0.5">{feature.description}</span>
+                    </td>
                     <td className="text-center p-6">
                       {feature.others ? (
                         <Check className="inline-block w-5 h-5 text-success" />
