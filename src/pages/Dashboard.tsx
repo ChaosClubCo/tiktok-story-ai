@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { lazy, Suspense, useState, useMemo, ComponentType } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { usePageTitle } from '@/hooks/usePageTitle';
 import { MainLayout } from '@/components/layout/MainLayout';
@@ -6,28 +6,29 @@ import { LoadingSpinner, AuthRequired, SectionHeader } from '@/components/shared
 import { QuickActionsGrid } from '@/components/dashboard';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-
-// Feature Components
-import ScriptWorkflow from '@/components/ScriptWorkflow';
-import ScriptGenerator from '@/components/ScriptGenerator';
-import { CreatorWellness } from '@/components/CreatorWellness';
-import { ViralTopicFinder } from '@/components/ViralTopicFinder';
-import { PerformanceTracker } from '@/components/PerformanceTracker';
-import { FastValueDelivery } from '@/components/FastValueDelivery';
-import { SocialProofCapture } from '@/components/SocialProofCapture';
-import { VisualCreativeHooks } from '@/components/VisualCreativeHooks';
-import { ChatFeedbackRewards } from '@/components/ChatFeedbackRewards';
-import { AIVideoGeneration } from '@/components/AIVideoGeneration';
-import { AIScriptOptimization } from '@/components/AIScriptOptimization';
-import { VoiceToneConsistency } from '@/components/VoiceToneConsistency';
-import { ContentCalendarIntegration } from '@/components/ContentCalendarIntegration';
-import { MultiPlatformAdaptation } from '@/components/MultiPlatformAdaptation';
-import { CreatorMarketplace } from '@/components/CreatorMarketplace';
+import { Skeleton } from '@/components/ui/skeleton';
 
 import {
   Workflow, Zap, TrendingUp, Heart, Target, Rocket, Users,
   Palette, MessageCircle, Video, Sparkles, Mic, Calendar, Share2, Store,
 } from 'lucide-react';
+
+// Lazy loaded components for code splitting
+const ScriptWorkflow = lazy(() => import('@/components/ScriptWorkflow'));
+const ScriptGenerator = lazy(() => import('@/components/ScriptGenerator'));
+const CreatorWellness = lazy(() => import('@/components/CreatorWellness').then(m => ({ default: m.CreatorWellness })));
+const ViralTopicFinder = lazy(() => import('@/components/ViralTopicFinder').then(m => ({ default: m.ViralTopicFinder })));
+const PerformanceTracker = lazy(() => import('@/components/PerformanceTracker').then(m => ({ default: m.PerformanceTracker })));
+const FastValueDelivery = lazy(() => import('@/components/FastValueDelivery').then(m => ({ default: m.FastValueDelivery })));
+const SocialProofCapture = lazy(() => import('@/components/SocialProofCapture').then(m => ({ default: m.SocialProofCapture })));
+const VisualCreativeHooks = lazy(() => import('@/components/VisualCreativeHooks').then(m => ({ default: m.VisualCreativeHooks })));
+const ChatFeedbackRewards = lazy(() => import('@/components/ChatFeedbackRewards').then(m => ({ default: m.ChatFeedbackRewards })));
+const AIVideoGeneration = lazy(() => import('@/components/AIVideoGeneration').then(m => ({ default: m.AIVideoGeneration })));
+const AIScriptOptimization = lazy(() => import('@/components/AIScriptOptimization').then(m => ({ default: m.AIScriptOptimization })));
+const VoiceToneConsistency = lazy(() => import('@/components/VoiceToneConsistency').then(m => ({ default: m.VoiceToneConsistency })));
+const ContentCalendarIntegration = lazy(() => import('@/components/ContentCalendarIntegration').then(m => ({ default: m.ContentCalendarIntegration })));
+const MultiPlatformAdaptation = lazy(() => import('@/components/MultiPlatformAdaptation').then(m => ({ default: m.MultiPlatformAdaptation })));
+const CreatorMarketplace = lazy(() => import('@/components/CreatorMarketplace').then(m => ({ default: m.CreatorMarketplace })));
 
 // Tab configuration - Single source of truth
 const TAB_CONFIG = [
@@ -48,9 +49,42 @@ const TAB_CONFIG = [
   { id: 'marketplace', label: 'Market', icon: Store },
 ] as const;
 
+// Tab content loading fallback
+function TabSkeleton() {
+  return (
+    <Card>
+      <CardHeader>
+        <Skeleton className="h-6 w-48" />
+        <Skeleton className="h-4 w-72 mt-2" />
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-4">
+          <Skeleton className="h-32 w-full" />
+          <div className="grid grid-cols-2 gap-4">
+            <Skeleton className="h-20" />
+            <Skeleton className="h-20" />
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// Wrapper component for lazy loaded content
+function LazyTabContent({ children }: { children: React.ReactNode }) {
+  return (
+    <Suspense fallback={<TabSkeleton />}>
+      {children}
+    </Suspense>
+  );
+}
+
 /**
  * Dashboard - Main script creation dashboard
- * Features tabbed interface for various creation tools
+ * Features:
+ * - Lazy loaded tab components for performance
+ * - Tabbed interface for various creation tools
+ * - Quick action cards
  */
 export default function Dashboard() {
   const { user, loading } = useAuth();
@@ -58,7 +92,7 @@ export default function Dashboard() {
 
   usePageTitle('Dashboard');
 
-  // Memoize tab content mapping
+  // Memoize tab content mapping with lazy components
   const tabContent = useMemo(() => ({
     workflow: (
       <Card>
@@ -72,7 +106,9 @@ export default function Dashboard() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <ScriptWorkflow />
+          <LazyTabContent>
+            <ScriptWorkflow />
+          </LazyTabContent>
         </CardContent>
       </Card>
     ),
@@ -88,23 +124,25 @@ export default function Dashboard() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <ScriptGenerator />
+          <LazyTabContent>
+            <ScriptGenerator />
+          </LazyTabContent>
         </CardContent>
       </Card>
     ),
-    topics: <ViralTopicFinder />,
-    wellness: <CreatorWellness />,
-    performance: <PerformanceTracker />,
-    'fast-delivery': <FastValueDelivery />,
-    'social-proof': <SocialProofCapture />,
-    'visual-hooks': <VisualCreativeHooks />,
-    'chat-rewards': <ChatFeedbackRewards />,
-    'ai-video': <AIVideoGeneration />,
-    optimization: <AIScriptOptimization />,
-    'voice-tone': <VoiceToneConsistency />,
-    calendar: <ContentCalendarIntegration />,
-    platform: <MultiPlatformAdaptation />,
-    marketplace: <CreatorMarketplace />,
+    topics: <LazyTabContent><ViralTopicFinder /></LazyTabContent>,
+    wellness: <LazyTabContent><CreatorWellness /></LazyTabContent>,
+    performance: <LazyTabContent><PerformanceTracker /></LazyTabContent>,
+    'fast-delivery': <LazyTabContent><FastValueDelivery /></LazyTabContent>,
+    'social-proof': <LazyTabContent><SocialProofCapture /></LazyTabContent>,
+    'visual-hooks': <LazyTabContent><VisualCreativeHooks /></LazyTabContent>,
+    'chat-rewards': <LazyTabContent><ChatFeedbackRewards /></LazyTabContent>,
+    'ai-video': <LazyTabContent><AIVideoGeneration /></LazyTabContent>,
+    optimization: <LazyTabContent><AIScriptOptimization /></LazyTabContent>,
+    'voice-tone': <LazyTabContent><VoiceToneConsistency /></LazyTabContent>,
+    calendar: <LazyTabContent><ContentCalendarIntegration /></LazyTabContent>,
+    platform: <LazyTabContent><MultiPlatformAdaptation /></LazyTabContent>,
+    marketplace: <LazyTabContent><CreatorMarketplace /></LazyTabContent>,
   }), []);
 
   if (loading) {

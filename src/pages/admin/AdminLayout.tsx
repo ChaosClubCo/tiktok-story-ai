@@ -1,74 +1,112 @@
-import { Outlet, Navigate, useNavigate } from 'react-router-dom';
+import { useState } from 'react';
+import { Outlet, Navigate } from 'react-router-dom';
 import { useAdmin } from '@/hooks/useAdmin';
 import { useAdminRouteProtection } from '@/hooks/useAdminRouteProtection';
-import { Button } from '@/components/ui/button';
+import { usePageTitle } from '@/hooks/usePageTitle';
+import { AdminSidebar, SecurityStatusBanner } from '@/components/admin';
+import { LoadingSpinner } from '@/components/shared';
 import { Users, FileText, TrendingUp, Settings, Shield } from 'lucide-react';
+import type { AdminNavItem } from '@/components/admin/types';
 
-export const AdminLayout = () => {
+// Admin navigation configuration
+const ADMIN_NAV_ITEMS: AdminNavItem[] = [
+  {
+    id: 'users',
+    label: 'Users',
+    path: '/admin/users',
+    icon: Users,
+    description: 'Manage user accounts',
+  },
+  {
+    id: 'content',
+    label: 'Content',
+    path: '/admin/content',
+    icon: FileText,
+    description: 'Moderate content',
+  },
+  {
+    id: 'security',
+    label: 'Security',
+    path: '/admin/security',
+    icon: Shield,
+    description: 'Security dashboard',
+    badge: 'Active',
+  },
+  {
+    id: 'analytics',
+    label: 'Analytics',
+    path: '/admin/analytics',
+    icon: TrendingUp,
+    description: 'View analytics',
+  },
+  {
+    id: 'system',
+    label: 'System',
+    path: '/admin/system',
+    icon: Settings,
+    description: 'System settings',
+    requiresSuperAdmin: true,
+  },
+];
+
+/**
+ * AdminLayout - Protected admin panel layout with sidebar navigation
+ * 
+ * Security Features:
+ * - Client-side admin role check
+ * - Server-side admin verification (defense-in-depth)
+ * - Active session monitoring
+ */
+export function AdminLayout() {
   const { isAdmin, loading } = useAdmin();
   const { isVerifying, isAuthorized } = useAdminRouteProtection('/');
-  const navigate = useNavigate();
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
-  // Show loading state if either check is in progress
+  usePageTitle('Admin Dashboard');
+
+  // Loading state during verification
   if (loading || isVerifying) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
+      <div className="flex items-center justify-center min-h-screen bg-background-base">
         <div className="text-center space-y-4">
-          <Shield className="w-12 h-12 mx-auto text-primary animate-pulse" />
+          <Shield className="w-12 h-12 mx-auto text-primary animate-pulse" aria-hidden="true" />
           <p className="text-muted-foreground">Verifying admin access...</p>
         </div>
       </div>
     );
   }
-  
-  // Client-side check (first layer)
-  if (!isAdmin) return <Navigate to="/" replace />;
-  
-  // Server-side check (second layer - defense-in-depth)
-  if (!isAuthorized) return <Navigate to="/" replace />;
+
+  // Client-side authorization check (first layer)
+  if (!isAdmin) {
+    return <Navigate to="/" replace />;
+  }
+
+  // Server-side authorization check (second layer - defense-in-depth)
+  if (!isAuthorized) {
+    return <Navigate to="/" replace />;
+  }
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="bg-background-elevated shadow-elevated border-b border-border">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Shield className="w-8 h-8 text-primary" />
-              <h1 className="text-2xl font-bold">MiniDrama Admin</h1>
-            </div>
-            <Button variant="outline" onClick={() => navigate('/')}>
-              Back to App
-            </Button>
-          </div>
+    <div className="flex min-h-screen bg-background-base">
+      {/* Sidebar */}
+      <AdminSidebar
+        items={ADMIN_NAV_ITEMS}
+        collapsed={sidebarCollapsed}
+        onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
+      />
+
+      {/* Main Content */}
+      <main className="flex-1 flex flex-col overflow-hidden">
+        {/* Security Status Banner */}
+        <div className="p-4 border-b border-border bg-background">
+          <SecurityStatusBanner />
         </div>
-      </header>
 
-      <div className="container mx-auto px-4 py-4">
-        <nav className="flex gap-2 mb-6">
-          <Button variant="ghost" onClick={() => navigate('/admin/users')}>
-            <Users className="w-4 h-4 mr-2" />
-            Users
-          </Button>
-          <Button variant="ghost" onClick={() => navigate('/admin/content')}>
-            <FileText className="w-4 h-4 mr-2" />
-            Content
-          </Button>
-          <Button variant="ghost" onClick={() => navigate('/admin/security')}>
-            <Shield className="w-4 h-4 mr-2" />
-            Security
-          </Button>
-          <Button variant="ghost" onClick={() => navigate('/admin/analytics')}>
-            <TrendingUp className="w-4 h-4 mr-2" />
-            Analytics
-          </Button>
-          <Button variant="ghost" onClick={() => navigate('/admin/system')}>
-            <Settings className="w-4 h-4 mr-2" />
-            System
-          </Button>
-        </nav>
-
-        <Outlet />
-      </div>
+        {/* Page Content */}
+        <div className="flex-1 overflow-auto">
+          <Outlet />
+        </div>
+      </main>
     </div>
   );
-};
+}
