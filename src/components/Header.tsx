@@ -12,10 +12,12 @@ import {
   Layers,
   Users,
   TrendingUp,
-  ListVideo
+  ListVideo,
+  Gauge
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
+import { PerformanceWidget } from '@/components/PerformanceWidget';
 
 // Navigation configuration - single source of truth
 const NAV_ITEMS: NavItem[] = [
@@ -28,6 +30,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'A/B Tests', path: '/ab-tests', icon: <FlaskConical className="h-4 w-4" /> },
   { label: 'Videos', path: '/video-generator', icon: <Film className="h-4 w-4" /> },
   { label: 'My Scripts', path: '/my-scripts', icon: <FileText className="h-4 w-4" /> },
+  { label: 'Performance', path: '/performance', icon: <Gauge className="h-4 w-4" /> },
 ];
 
 /**
@@ -94,8 +97,9 @@ export function Header() {
           ))}
         </nav>
 
-        {/* User Profile */}
+        {/* Performance Widget & User Profile */}
         <div className="flex items-center gap-3">
+          <PerformanceWidget />
           <span className="text-sm text-muted-foreground hidden lg:block truncate max-w-[150px]">
             {user.email}
           </span>
