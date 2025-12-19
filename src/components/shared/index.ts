@@ -8,3 +8,5 @@ export { PageContainer } from './PageContainer';
 export { SectionHeader } from './SectionHeader';
 export { FeatureCard } from './FeatureCard';
 export { MobileNav, type NavItem } from './MobileNav';
+export { RouteErrorBoundary } from './RouteErrorBoundary';
+export { PrefetchLink } from './PrefetchLink';
