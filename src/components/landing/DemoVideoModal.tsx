@@ -11,14 +11,50 @@ import {
 
 interface DemoVideoModalProps {
   trigger?: React.ReactNode;
+  /** YouTube video ID (e.g., 'dQw4w9WgXcQ' from youtube.com/watch?v=dQw4w9WgXcQ) */
+  youtubeId?: string;
+  /** Vimeo video ID (e.g., '123456789' from vimeo.com/123456789) */
+  vimeoId?: string;
 }
 
 /**
  * DemoVideoModal - Video walkthrough modal
  * Shows product demo video in a modal overlay
+ * 
+ * Usage:
+ * - For YouTube: <DemoVideoModal youtubeId="your-video-id" />
+ * - For Vimeo: <DemoVideoModal vimeoId="your-video-id" />
  */
-export function DemoVideoModal({ trigger }: DemoVideoModalProps) {
+export function DemoVideoModal({ trigger, youtubeId, vimeoId }: DemoVideoModalProps) {
   const [isOpen, setIsOpen] = useState(false);
+
+  const hasVideo = youtubeId || vimeoId;
+
+  const getVideoEmbed = () => {
+    if (youtubeId) {
+      return (
+        <iframe
+          src={`https://www.youtube.com/embed/${youtubeId}?autoplay=1&rel=0`}
+          className="w-full h-full"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+          allowFullScreen
+          title="MiniDrama Demo Video"
+        />
+      );
+    }
+    if (vimeoId) {
+      return (
+        <iframe
+          src={`https://player.vimeo.com/video/${vimeoId}?autoplay=1`}
+          className="w-full h-full"
+          allow="autoplay; fullscreen; picture-in-picture"
+          allowFullScreen
+          title="MiniDrama Demo Video"
+        />
+      );
+    }
+    return null;
+  };
 
   const defaultTrigger = (
     <motion.div
@@ -94,27 +130,27 @@ export function DemoVideoModal({ trigger }: DemoVideoModalProps) {
           </DialogHeader>
           
           <div className="aspect-video w-full bg-black relative">
-            {/* Placeholder for video embed */}
-            <div className="absolute inset-0 flex items-center justify-center flex-col gap-4">
-              <div className="w-20 h-20 rounded-full bg-muted/20 flex items-center justify-center">
-                <Play className="w-8 h-8 text-muted-foreground" />
+            {hasVideo ? (
+              getVideoEmbed()
+            ) : (
+              /* Placeholder when no video is configured */
+              <div className="absolute inset-0 flex items-center justify-center flex-col gap-4 bg-gradient-to-br from-muted/20 to-background">
+                <div className="w-20 h-20 rounded-full bg-primary/20 flex items-center justify-center">
+                  <Play className="w-8 h-8 text-primary" />
+                </div>
+                <div className="text-center space-y-2">
+                  <p className="text-foreground font-medium">
+                    Demo Video Coming Soon
+                  </p>
+                  <p className="text-muted-foreground text-sm max-w-sm">
+                    Add your YouTube or Vimeo video ID to the DemoVideoModal component:
+                  </p>
+                  <code className="text-xs bg-muted px-3 py-1.5 rounded-lg block max-w-md mx-auto text-left">
+                    {'<DemoVideoModal youtubeId="your-video-id" />'}
+                  </code>
+                </div>
               </div>
-              <p className="text-muted-foreground text-sm">
-                Video demo coming soon
-              </p>
-              <p className="text-muted-foreground/60 text-xs">
-                Embed your walkthrough video here
-              </p>
-            </div>
-            
-            {/* When you have a video, replace the above with:
-            <iframe
-              src="https://www.youtube.com/embed/YOUR_VIDEO_ID?autoplay=1"
-              className="w-full h-full"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-              allowFullScreen
-            /> 
-            */}
+            )}
           </div>
 
           <div className="p-4 border-t border-border/50 flex items-center justify-between">
