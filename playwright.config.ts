@@ -1,7 +1,15 @@
 import { defineConfig, devices } from '@playwright/test';
 
 /**
- * Playwright E2E Test Configuration
+ * Playwright E2E & Visual Regression Test Configuration
+ * 
+ * Commands:
+ * - Run all tests: npx playwright test
+ * - Run with UI: npx playwright test --ui
+ * - Run specific test: npx playwright test e2e/auth.spec.ts
+ * - Update snapshots: npx playwright test --update-snapshots
+ * - Generate report: npx playwright show-report
+ * 
  * @see https://playwright.dev/docs/test-configuration
  */
 export default defineConfig({
@@ -19,10 +27,11 @@ export default defineConfig({
   /* Opt out of parallel tests on CI */
   workers: process.env.CI ? 1 : undefined,
   
-  /* Reporter to use */
+  /* Reporter configuration with HTML report and coverage */
   reporter: [
-    ['html', { outputFolder: 'playwright-report' }],
+    ['html', { outputFolder: 'playwright-report', open: 'never' }],
     ['list'],
+    ['json', { outputFile: 'playwright-report/results.json' }],
   ],
   
   /* Shared settings for all projects */
@@ -39,6 +48,20 @@ export default defineConfig({
     /* Video recording */
     video: 'on-first-retry',
   },
+
+  /* Visual comparison options */
+  expect: {
+    toHaveScreenshot: {
+      maxDiffPixelRatio: 0.02,
+      animations: 'disabled',
+    },
+    toMatchSnapshot: {
+      maxDiffPixelRatio: 0.02,
+    },
+  },
+
+  /* Snapshot output directory */
+  snapshotDir: './e2e/__snapshots__',
 
   /* Configure projects for major browsers */
   projects: [
