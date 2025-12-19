@@ -30,6 +30,7 @@ const ABTests = lazy(() => import("./pages/ABTests"));
 const Install = lazy(() => import("./pages/Install"));
 const Performance = lazy(() => import("./pages/Performance"));
 const Onboarding = lazy(() => import("./pages/Onboarding"));
+const Settings = lazy(() => import("./pages/Settings"));
 
 // Lazy load admin pages
 const AdminLayout = lazy(() => import("./pages/admin/AdminLayout").then(m => ({ default: m.AdminLayout })));
@@ -80,6 +81,7 @@ const AppContent = () => {
                     <Route path="/install" element={<Install />} />
                     <Route path="/performance" element={<Performance />} />
                     <Route path="/onboarding" element={<Onboarding />} />
+                    <Route path="/settings" element={<Settings />} />
                     
                     {/* Admin routes - lazy loaded */}
                     <Route path="/admin" element={<AdminLayout />}>
