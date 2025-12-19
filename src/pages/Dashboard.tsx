@@ -4,7 +4,7 @@ import { usePageTitle } from '@/hooks/usePageTitle';
 import { useOnboardingRedirect } from '@/hooks/useOnboardingRedirect';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { LoadingSpinner, AuthRequired, SectionHeader } from '@/components/shared';
-import { QuickActionsGrid } from '@/components/dashboard';
+import { QuickActionsGrid, PersonalizedRecommendations } from '@/components/dashboard';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -166,6 +166,9 @@ export default function Dashboard() {
             description="Create viral TikTok scripts with our advanced workflow and AI-powered tools"
             gradient
           />
+
+          {/* Personalized Recommendations */}
+          <PersonalizedRecommendations onNavigate={setActiveTab} />
 
           {/* Quick Actions */}
           <QuickActionsGrid onNewScript={() => setActiveTab('workflow')} />

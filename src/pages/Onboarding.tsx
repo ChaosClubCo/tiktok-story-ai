@@ -23,6 +23,7 @@ import { usePageTitle } from '@/hooks/usePageTitle';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { EmailVerificationReminder } from '@/components/onboarding/EmailVerificationReminder';
 
 const NICHES = [
   { id: 'romance', label: 'Romance', emoji: '💕', color: 'bg-pink-500/10 border-pink-500/30' },
@@ -53,12 +54,15 @@ const STEPS = [
  */
 export default function Onboarding() {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, session } = useAuth();
   const { toast } = useToast();
   const [currentStep, setCurrentStep] = useState(0);
   const [selectedNiche, setSelectedNiche] = useState<string | null>(null);
   const [selectedGoals, setSelectedGoals] = useState<string[]>([]);
   const [isSaving, setIsSaving] = useState(false);
+
+  // Check if email is verified
+  const isEmailVerified = user?.email_confirmed_at != null;
 
   usePageTitle('Get Started - MiniDrama');
 
@@ -194,6 +198,14 @@ export default function Onboarding() {
       {/* Content */}
       <main className="flex-1 container mx-auto px-4 py-8 flex items-center justify-center">
         <div className="w-full max-w-2xl">
+          {/* Email Verification Reminder */}
+          {user?.email && (
+            <EmailVerificationReminder 
+              email={user.email} 
+              isVerified={isEmailVerified} 
+            />
+          )}
+
           <AnimatePresence mode="wait">
             {/* Step 1: Welcome */}
             {STEPS[currentStep].id === 'welcome' && (
