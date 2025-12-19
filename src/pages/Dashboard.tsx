@@ -1,4 +1,4 @@
-import { lazy, Suspense, useState, useMemo, ComponentType } from 'react';
+import { lazy, Suspense, useState, useMemo } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { usePageTitle } from '@/hooks/usePageTitle';
 import { MainLayout } from '@/components/layout/MainLayout';
@@ -10,7 +10,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 
 import {
   Workflow, Zap, TrendingUp, Heart, Target, Rocket, Users,
-  Palette, MessageCircle, Video, Sparkles, Mic, Calendar, Share2, Store,
+  Palette, MessageCircle, Video, Sparkles, Mic, Calendar, Share2, Store, Gauge,
 } from 'lucide-react';
 
 // Lazy loaded components for code splitting
@@ -29,6 +29,7 @@ const VoiceToneConsistency = lazy(() => import('@/components/VoiceToneConsistenc
 const ContentCalendarIntegration = lazy(() => import('@/components/ContentCalendarIntegration').then(m => ({ default: m.ContentCalendarIntegration })));
 const MultiPlatformAdaptation = lazy(() => import('@/components/MultiPlatformAdaptation').then(m => ({ default: m.MultiPlatformAdaptation })));
 const CreatorMarketplace = lazy(() => import('@/components/CreatorMarketplace').then(m => ({ default: m.CreatorMarketplace })));
+const PerformanceDashboard = lazy(() => import('@/components/PerformanceDashboard').then(m => ({ default: m.PerformanceDashboard })));
 
 // Tab configuration - Single source of truth
 const TAB_CONFIG = [
@@ -47,6 +48,7 @@ const TAB_CONFIG = [
   { id: 'calendar', label: 'Calendar', icon: Calendar },
   { id: 'platform', label: 'Platform', icon: Share2 },
   { id: 'marketplace', label: 'Market', icon: Store },
+  { id: 'vitals', label: 'Vitals', icon: Gauge },
 ] as const;
 
 // Tab content loading fallback
@@ -143,6 +145,7 @@ export default function Dashboard() {
     calendar: <LazyTabContent><ContentCalendarIntegration /></LazyTabContent>,
     platform: <LazyTabContent><MultiPlatformAdaptation /></LazyTabContent>,
     marketplace: <LazyTabContent><CreatorMarketplace /></LazyTabContent>,
+    vitals: <LazyTabContent><PerformanceDashboard /></LazyTabContent>,
   }), []);
 
   if (loading) {
@@ -165,7 +168,7 @@ export default function Dashboard() {
 
           {/* Main Tabs */}
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-            <TabsList className="grid w-full grid-cols-5 lg:grid-cols-15 gap-1 h-auto p-1">
+            <TabsList className="grid w-full grid-cols-5 lg:grid-cols-16 gap-1 h-auto p-1">
               {TAB_CONFIG.map(({ id, label, icon: Icon }) => (
                 <TabsTrigger
                   key={id}

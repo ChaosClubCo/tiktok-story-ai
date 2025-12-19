@@ -7,7 +7,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import { AdminProvider } from "@/hooks/useAdmin";
 import { useSecurityHeaders } from "@/hooks/useSecurityHeaders";
-import { LoadingSpinner, SkipLinks } from "@/components/shared";
+import { LoadingSpinner, SkipLinks, ErrorBoundary } from "@/components/shared";
 import { RouteErrorBoundary } from "@/components/shared/RouteErrorBoundary";
 
 // Eagerly load critical pages
@@ -28,6 +28,7 @@ const VideoGenerator = lazy(() => import("./pages/VideoGenerator"));
 const VideoEditor = lazy(() => import("./pages/VideoEditor"));
 const ABTests = lazy(() => import("./pages/ABTests"));
 const Install = lazy(() => import("./pages/Install"));
+const Performance = lazy(() => import("./pages/Performance"));
 
 // Lazy load admin pages
 const AdminLayout = lazy(() => import("./pages/admin/AdminLayout").then(m => ({ default: m.AdminLayout })));
@@ -44,7 +45,7 @@ const PageLoader = () => (
   </div>
 );
 
-const App = () => {
+const AppContent = () => {
   useSecurityHeaders();
   
   return (
@@ -76,6 +77,7 @@ const App = () => {
                     <Route path="/ab-tests" element={<ABTests />} />
                     <Route path="/my-scripts" element={<MyScripts />} />
                     <Route path="/install" element={<Install />} />
+                    <Route path="/performance" element={<Performance />} />
                     
                     {/* Admin routes - lazy loaded */}
                     <Route path="/admin" element={<AdminLayout />}>
@@ -96,6 +98,14 @@ const App = () => {
         </AdminProvider>
       </AuthProvider>
     </QueryClientProvider>
+  );
+};
+
+const App = () => {
+  return (
+    <ErrorBoundary>
+      <AppContent />
+    </ErrorBoundary>
   );
 };
 
