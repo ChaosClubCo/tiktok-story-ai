@@ -9,6 +9,7 @@ import {
   TestimonialsSection,
   ResultsShowcaseSection,
   TrustBadgesSection,
+  StickyCTABar,
 } from '@/components/landing';
 import { SubscriptionTiers } from '@/components/SubscriptionTiers';
 import { LandingViralPredictorCard } from '@/components/LandingViralPredictorCard';
@@ -41,6 +42,9 @@ export default function Index() {
 
   return (
     <MainLayout background="base">
+      {/* Sticky CTA Bar */}
+      <StickyCTABar />
+
       {/* Hero Section with Demo Video */}
       <HeroSection />
 

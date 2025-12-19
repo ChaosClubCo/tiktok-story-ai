@@ -7,3 +7,4 @@ export { TestimonialsSection } from './TestimonialsSection';
 export { DemoVideoModal } from './DemoVideoModal';
 export { ResultsShowcaseSection } from './ResultsShowcaseSection';
 export { TrustBadgesSection } from './TrustBadgesSection';
+export { StickyCTABar } from './StickyCTABar';
