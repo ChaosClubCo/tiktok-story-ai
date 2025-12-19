@@ -1,6 +1,7 @@
 import { lazy, Suspense, useState, useMemo } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { usePageTitle } from '@/hooks/usePageTitle';
+import { useOnboardingRedirect } from '@/hooks/useOnboardingRedirect';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { LoadingSpinner, AuthRequired, SectionHeader } from '@/components/shared';
 import { QuickActionsGrid } from '@/components/dashboard';
@@ -91,6 +92,9 @@ function LazyTabContent({ children }: { children: React.ReactNode }) {
 export default function Dashboard() {
   const { user, loading } = useAuth();
   const [activeTab, setActiveTab] = useState('workflow');
+
+  // Check onboarding status and redirect if not completed
+  useOnboardingRedirect();
 
   usePageTitle('Dashboard');
 
