@@ -13,6 +13,7 @@ import { useSecurityMonitoring } from "@/hooks/useSecurityMonitoring";
 import { useRateLimit } from "@/hooks/useRateLimit";
 import { SecurityIndicator } from "@/components/SecurityIndicator";
 import { signUpSchema, loginSchema, passwordResetSchema } from "@/lib/authValidation";
+import { useAuth } from "@/hooks/useAuth";
 
 const Auth = () => {
   const [email, setEmail] = useState("");
@@ -24,6 +25,7 @@ const Auth = () => {
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { profile, profileLoading } = useAuth();
   const { monitorAuthAttempts, monitorSuspiciousActivity } = useSecurityMonitoring();
   const authRateLimit = useRateLimit({ maxAttempts: 5, windowMs: 15 * 60 * 1000, identifier: 'auth' });
   const passwordResetRateLimit = useRateLimit({ maxAttempts: 3, windowMs: 5 * 60 * 1000, identifier: 'password-reset' });
@@ -39,11 +41,27 @@ const Auth = () => {
     });
   };
 
+  // Helper function to redirect based on onboarding status
+  const redirectAfterAuth = async (userId: string) => {
+    // Check if user has completed onboarding
+    const { data: profileData } = await supabase
+      .from('profiles')
+      .select('onboarding_completed')
+      .eq('user_id', userId)
+      .single();
+
+    if (profileData && !profileData.onboarding_completed) {
+      navigate("/onboarding");
+    } else {
+      navigate("/dashboard");
+    }
+  };
+
   useEffect(() => {
     const checkSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
-        navigate("/");
+        await redirectAfterAuth(session.user.id);
       }
     };
     checkSession();
@@ -122,12 +140,13 @@ const Auth = () => {
           title: "Check Your Email!",
           description: "We've sent you a confirmation link. Please check your inbox and click the link to activate your account.",
         });
-      } else {
+      } else if (data.session) {
         toast({
           title: "Account Created!",
           description: "You have been signed in successfully.",
         });
-        navigate("/");
+        // Redirect to onboarding for new users
+        navigate("/onboarding");
       }
       setEmail("");
       setPassword("");
@@ -184,10 +203,8 @@ const Auth = () => {
         title: "Welcome back!",
         description: "You have been signed in successfully",
       });
-      // Wait a moment for the auth state to update
-      setTimeout(() => {
-        navigate("/");
-      }, 100);
+      // Redirect based on onboarding status
+      await redirectAfterAuth(data.session.user.id);
     }
   };
 

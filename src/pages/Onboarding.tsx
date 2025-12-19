@@ -15,11 +15,14 @@ import {
   ArrowRight,
   ArrowLeft,
   Check,
-  Rocket
+  Rocket,
+  Loader2
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { usePageTitle } from '@/hooks/usePageTitle';
 import { cn } from '@/lib/utils';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 
 const NICHES = [
   { id: 'romance', label: 'Romance', emoji: '💕', color: 'bg-pink-500/10 border-pink-500/30' },
@@ -51,9 +54,11 @@ const STEPS = [
 export default function Onboarding() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { toast } = useToast();
   const [currentStep, setCurrentStep] = useState(0);
   const [selectedNiche, setSelectedNiche] = useState<string | null>(null);
   const [selectedGoals, setSelectedGoals] = useState<string[]>([]);
+  const [isSaving, setIsSaving] = useState(false);
 
   usePageTitle('Get Started - MiniDrama');
 
@@ -71,11 +76,55 @@ export default function Onboarding() {
     }
   };
 
-  const handleComplete = () => {
-    // Navigate to series builder with selected preferences
-    const params = new URLSearchParams();
-    if (selectedNiche) params.set('niche', selectedNiche);
-    navigate(`/series/builder?${params.toString()}`);
+  const saveOnboardingPreferences = async () => {
+    if (!user) return false;
+    
+    setIsSaving(true);
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          preferred_niche: selectedNiche,
+          goals: selectedGoals,
+          onboarding_completed: true,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+      return true;
+    } catch (error) {
+      console.error('Failed to save onboarding preferences:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to save your preferences. Please try again.',
+        variant: 'destructive',
+      });
+      return false;
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleComplete = async () => {
+    const saved = await saveOnboardingPreferences();
+    if (saved) {
+      // Navigate to series builder with selected preferences
+      const params = new URLSearchParams();
+      if (selectedNiche) params.set('niche', selectedNiche);
+      navigate(`/series/builder?${params.toString()}`);
+    }
+  };
+
+  const handleSkip = async () => {
+    // Mark onboarding as complete even if skipped
+    if (user) {
+      await supabase
+        .from('profiles')
+        .update({ onboarding_completed: true })
+        .eq('user_id', user.id);
+    }
+    navigate('/dashboard');
   };
 
   const toggleGoal = (goalId: string) => {
@@ -115,7 +164,7 @@ export default function Onboarding() {
           <Button 
             variant="ghost" 
             size="sm"
-            onClick={() => navigate('/dashboard')}
+            onClick={handleSkip}
           >
             Skip for now
           </Button>
@@ -341,9 +390,18 @@ export default function Onboarding() {
             </Button>
             
             {currentStep === STEPS.length - 1 ? (
-              <Button onClick={handleComplete} size="lg" className="shadow-glow">
-                Create My First Series
-                <Sparkles className="w-4 h-4 ml-2" />
+              <Button onClick={handleComplete} size="lg" className="shadow-glow" disabled={isSaving}>
+                {isSaving ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    Create My First Series
+                    <Sparkles className="w-4 h-4 ml-2" />
+                  </>
+                )}
               </Button>
             ) : (
               <Button
