@@ -30,7 +30,9 @@ export function MainLayout({
   return (
     <div className={cn('min-h-screen', backgroundClasses[background], className)}>
       {showHeader && <Header />}
-      {children}
+      <main id="main-content" tabIndex={-1} className="outline-none">
+        {children}
+      </main>
     </div>
   );
 }

@@ -77,6 +77,7 @@ export function Header() {
 
         {/* Desktop Navigation */}
         <nav 
+          id="main-navigation"
           className="hidden md:flex items-center gap-1" 
           role="navigation" 
           aria-label="Main navigation"

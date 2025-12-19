@@ -7,7 +7,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import { AdminProvider } from "@/hooks/useAdmin";
 import { useSecurityHeaders } from "@/hooks/useSecurityHeaders";
-import { LoadingSpinner } from "@/components/shared";
+import { LoadingSpinner, SkipLinks } from "@/components/shared";
 import { RouteErrorBoundary } from "@/components/shared/RouteErrorBoundary";
 
 // Eagerly load critical pages
@@ -55,6 +55,7 @@ const App = () => {
             <Toaster />
             <Sonner />
             <BrowserRouter>
+              <SkipLinks />
               <RouteErrorBoundary>
                 <Suspense fallback={<PageLoader />}>
                   <Routes>
