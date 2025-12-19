@@ -8,6 +8,7 @@ import { AuthProvider } from "@/hooks/useAuth";
 import { AdminProvider } from "@/hooks/useAdmin";
 import { useSecurityHeaders } from "@/hooks/useSecurityHeaders";
 import { LoadingSpinner } from "@/components/shared";
+import { RouteErrorBoundary } from "@/components/shared/RouteErrorBoundary";
 
 // Eagerly load critical pages
 import Index from "./pages/Index";
@@ -54,39 +55,41 @@ const App = () => {
             <Toaster />
             <Sonner />
             <BrowserRouter>
-              <Suspense fallback={<PageLoader />}>
-                <Routes>
-                  {/* Critical routes - eagerly loaded */}
-                  <Route path="/" element={<Index />} />
-                  <Route path="/auth" element={<Auth />} />
-                  
-                  {/* Main app routes - lazy loaded */}
-                  <Route path="/dashboard" element={<Dashboard />} />
-                  <Route path="/analytics" element={<Analytics />} />
-                  <Route path="/templates" element={<Templates />} />
-                  <Route path="/collaborate" element={<Collaborate />} />
-                  <Route path="/predictions" element={<Predictions />} />
-                  <Route path="/series" element={<Series />} />
-                  <Route path="/series/builder" element={<SeriesBuilder />} />
-                  <Route path="/video-generator" element={<VideoGenerator />} />
-                  <Route path="/video-editor/:projectId" element={<VideoEditor />} />
-                  <Route path="/ab-tests" element={<ABTests />} />
-                  <Route path="/my-scripts" element={<MyScripts />} />
-                  <Route path="/install" element={<Install />} />
-                  
-                  {/* Admin routes - lazy loaded */}
-                  <Route path="/admin" element={<AdminLayout />}>
-                    <Route path="users" element={<AdminUsersPage />} />
-                    <Route path="content" element={<AdminContentPage />} />
-                    <Route path="security" element={<SecurityPage />} />
-                    <Route path="analytics" element={<div className="p-8 text-center">Analytics Coming Soon</div>} />
-                    <Route path="system" element={<div className="p-8 text-center">System Health Coming Soon</div>} />
-                  </Route>
-                  
-                  {/* Catch-all - eagerly loaded */}
-                  <Route path="*" element={<NotFound />} />
-                </Routes>
-              </Suspense>
+              <RouteErrorBoundary>
+                <Suspense fallback={<PageLoader />}>
+                  <Routes>
+                    {/* Critical routes - eagerly loaded */}
+                    <Route path="/" element={<Index />} />
+                    <Route path="/auth" element={<Auth />} />
+                    
+                    {/* Main app routes - lazy loaded */}
+                    <Route path="/dashboard" element={<Dashboard />} />
+                    <Route path="/analytics" element={<Analytics />} />
+                    <Route path="/templates" element={<Templates />} />
+                    <Route path="/collaborate" element={<Collaborate />} />
+                    <Route path="/predictions" element={<Predictions />} />
+                    <Route path="/series" element={<Series />} />
+                    <Route path="/series/builder" element={<SeriesBuilder />} />
+                    <Route path="/video-generator" element={<VideoGenerator />} />
+                    <Route path="/video-editor/:projectId" element={<VideoEditor />} />
+                    <Route path="/ab-tests" element={<ABTests />} />
+                    <Route path="/my-scripts" element={<MyScripts />} />
+                    <Route path="/install" element={<Install />} />
+                    
+                    {/* Admin routes - lazy loaded */}
+                    <Route path="/admin" element={<AdminLayout />}>
+                      <Route path="users" element={<AdminUsersPage />} />
+                      <Route path="content" element={<AdminContentPage />} />
+                      <Route path="security" element={<SecurityPage />} />
+                      <Route path="analytics" element={<div className="p-8 text-center">Analytics Coming Soon</div>} />
+                      <Route path="system" element={<div className="p-8 text-center">System Health Coming Soon</div>} />
+                    </Route>
+                    
+                    {/* Catch-all - eagerly loaded */}
+                    <Route path="*" element={<NotFound />} />
+                  </Routes>
+                </Suspense>
+              </RouteErrorBoundary>
             </BrowserRouter>
           </TooltipProvider>
         </AdminProvider>
