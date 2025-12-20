@@ -315,6 +315,45 @@ export type Database = {
         }
         Relationships: []
       }
+      notification_preferences: {
+        Row: {
+          created_at: string
+          email_collaboration: boolean
+          email_marketing: boolean
+          email_product_updates: boolean
+          email_script_analysis: boolean
+          email_series_reminders: boolean
+          email_weekly_digest: boolean
+          id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          email_collaboration?: boolean
+          email_marketing?: boolean
+          email_product_updates?: boolean
+          email_script_analysis?: boolean
+          email_series_reminders?: boolean
+          email_weekly_digest?: boolean
+          id?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          email_collaboration?: boolean
+          email_marketing?: boolean
+          email_product_updates?: boolean
+          email_script_analysis?: boolean
+          email_series_reminders?: boolean
+          email_weekly_digest?: boolean
+          id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       predictions_history: {
         Row: {
           conflict_clarity: number
