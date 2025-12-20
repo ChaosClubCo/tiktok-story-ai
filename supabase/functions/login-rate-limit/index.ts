@@ -248,6 +248,28 @@ serve(async (req) => {
             blockMinutes 
           });
 
+          // Send security alert email (fire and forget)
+          try {
+            const alertUrl = `${supabaseUrl}/functions/v1/send-security-alert`;
+            fetch(alertUrl, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${serviceRoleKey}`,
+              },
+              body: JSON.stringify({
+                userId: '00000000-0000-0000-0000-000000000000', // Will be looked up from IP activity
+                alertType: 'login_blocked',
+                ipAddress: ipAddress,
+                userAgent: req.headers.get('user-agent') || '',
+                failedAttempts: newFailedAttempts,
+                blockedUntil: blockedUntil,
+              }),
+            }).catch(err => logStep('Failed to send security alert', { error: err.message }));
+          } catch (alertError) {
+            logStep('Security alert error', { error: alertError });
+          }
+
           return new Response(JSON.stringify({
             allowed: false,
             blocked: true,

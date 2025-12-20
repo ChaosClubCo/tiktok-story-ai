@@ -338,6 +338,26 @@ serve(async (req) => {
             .eq('user_id', user.id);
           
           logStep('2FA enabled and upgraded to AES-GCM', { userId: user.id.slice(0, 8) });
+          
+          // Send security alert for 2FA enabled
+          try {
+            const alertUrl = `${supabaseUrl}/functions/v1/send-security-alert`;
+            fetch(alertUrl, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${serviceRoleKey}`,
+              },
+              body: JSON.stringify({
+                userId: user.id,
+                alertType: '2fa_enabled',
+                ipAddress: req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || '',
+                userAgent: req.headers.get('user-agent') || '',
+              }),
+            }).catch(err => logStep('Failed to send 2FA enabled alert', { error: err.message }));
+          } catch (alertError) {
+            logStep('Security alert error', { error: alertError });
+          }
         } else {
           await supabase
             .from(tableName)
@@ -348,6 +368,26 @@ serve(async (req) => {
             .eq('user_id', user.id);
           
           logStep('2FA enabled successfully', { userId: user.id.slice(0, 8) });
+          
+          // Send security alert for 2FA enabled
+          try {
+            const alertUrl = `${supabaseUrl}/functions/v1/send-security-alert`;
+            fetch(alertUrl, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${serviceRoleKey}`,
+              },
+              body: JSON.stringify({
+                userId: user.id,
+                alertType: '2fa_enabled',
+                ipAddress: req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || '',
+                userAgent: req.headers.get('user-agent') || '',
+              }),
+            }).catch(err => logStep('Failed to send 2FA enabled alert', { error: err.message }));
+          } catch (alertError) {
+            logStep('Security alert error', { error: alertError });
+          }
         }
         
         return new Response(
@@ -499,6 +539,26 @@ serve(async (req) => {
           .eq('user_id', user.id);
         
         logStep('2FA disabled', { userId: user.id.slice(0, 8) });
+        
+        // Send security alert for 2FA disabled
+        try {
+          const alertUrl = `${supabaseUrl}/functions/v1/send-security-alert`;
+          fetch(alertUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${serviceRoleKey}`,
+            },
+            body: JSON.stringify({
+              userId: user.id,
+              alertType: '2fa_disabled',
+              ipAddress: req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || '',
+              userAgent: req.headers.get('user-agent') || '',
+            }),
+          }).catch(err => logStep('Failed to send 2FA disabled alert', { error: err.message }));
+        } catch (alertError) {
+          logStep('Security alert error', { error: alertError });
+        }
         
         return new Response(
           JSON.stringify({ success: true, message: '2FA has been disabled' }),
