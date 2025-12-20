@@ -315,6 +315,45 @@ export type Database = {
         }
         Relationships: []
       }
+      login_activity: {
+        Row: {
+          browser: string | null
+          created_at: string
+          device_type: string | null
+          failure_reason: string | null
+          id: string
+          ip_address: unknown
+          location: string | null
+          success: boolean
+          user_agent: string | null
+          user_id: string
+        }
+        Insert: {
+          browser?: string | null
+          created_at?: string
+          device_type?: string | null
+          failure_reason?: string | null
+          id?: string
+          ip_address?: unknown
+          location?: string | null
+          success?: boolean
+          user_agent?: string | null
+          user_id: string
+        }
+        Update: {
+          browser?: string | null
+          created_at?: string
+          device_type?: string | null
+          failure_reason?: string | null
+          id?: string
+          ip_address?: unknown
+          location?: string | null
+          success?: boolean
+          user_agent?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       notification_preferences: {
         Row: {
           created_at: string
