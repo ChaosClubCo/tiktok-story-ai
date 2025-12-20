@@ -7,6 +7,9 @@ import {
   NotificationPreferences,
   PasswordChange,
   LinkedAccounts,
+  SessionManagement,
+  AccountDeletion,
+  TwoFactorAuth,
 } from '@/components/settings';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { User, Bell, Lock, Link2, ArrowLeft } from 'lucide-react';
@@ -60,7 +63,12 @@ export default function Settings() {
 
             <TabsContent value="profile"><ProfileSettings /></TabsContent>
             <TabsContent value="notifications"><NotificationPreferences /></TabsContent>
-            <TabsContent value="security"><PasswordChange /></TabsContent>
+            <TabsContent value="security" className="space-y-6">
+              <PasswordChange />
+              <TwoFactorAuth />
+              <SessionManagement />
+              <AccountDeletion />
+            </TabsContent>
             <TabsContent value="accounts"><LinkedAccounts /></TabsContent>
           </Tabs>
         </div>

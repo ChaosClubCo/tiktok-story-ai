@@ -69,3 +69,9 @@ verify_jwt = true
 
 [functions.admin-2fa]
 verify_jwt = true
+
+[functions.user-2fa]
+verify_jwt = true
+
+[functions.delete-account]
+verify_jwt = true

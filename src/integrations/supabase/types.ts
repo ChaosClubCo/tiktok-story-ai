@@ -819,6 +819,39 @@ export type Database = {
         }
         Relationships: []
       }
+      user_totp: {
+        Row: {
+          backup_codes: string[] | null
+          created_at: string | null
+          id: string
+          is_enabled: boolean | null
+          last_used_at: string | null
+          secret_encrypted: string
+          user_id: string
+          verified_at: string | null
+        }
+        Insert: {
+          backup_codes?: string[] | null
+          created_at?: string | null
+          id?: string
+          is_enabled?: boolean | null
+          last_used_at?: string | null
+          secret_encrypted: string
+          user_id: string
+          verified_at?: string | null
+        }
+        Update: {
+          backup_codes?: string[] | null
+          created_at?: string | null
+          id?: string
+          is_enabled?: boolean | null
+          last_used_at?: string | null
+          secret_encrypted?: string
+          user_id?: string
+          verified_at?: string | null
+        }
+        Relationships: []
+      }
       video_assets: {
         Row: {
           asset_type: string
