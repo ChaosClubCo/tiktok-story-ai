@@ -40,6 +40,7 @@ const Auth = () => {
   const [password, setPassword] = useState("");
   const [resetEmail, setResetEmail] = useState("");
   const [captcha, setCaptcha] = useState({ question: "", answer: 0, userAnswer: "" });
+  const [loginCaptcha, setLoginCaptcha] = useState({ question: "", answer: 0, userAnswer: "" });
   const [isLoading, setIsLoading] = useState(false);
   const [isResetLoading, setIsResetLoading] = useState(false);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
@@ -58,7 +59,7 @@ const Auth = () => {
     loginRateLimit.checkRateLimit();
   }, []);
 
-  // Generate simple math captcha
+  // Generate simple math captcha for signup
   const generateCaptcha = () => {
     const a = Math.floor(Math.random() * 10) + 1;
     const b = Math.floor(Math.random() * 10) + 1;
@@ -68,6 +69,24 @@ const Auth = () => {
       userAnswer: ""
     });
   };
+
+  // Generate login captcha (shown after 3 failed attempts)
+  const generateLoginCaptcha = () => {
+    const a = Math.floor(Math.random() * 10) + 1;
+    const b = Math.floor(Math.random() * 10) + 1;
+    setLoginCaptcha({
+      question: `${a} + ${b} = ?`,
+      answer: a + b,
+      userAnswer: ""
+    });
+  };
+
+  // Generate login captcha when required
+  useEffect(() => {
+    if (loginRateLimit.requiresCaptcha && !loginCaptcha.question) {
+      generateLoginCaptcha();
+    }
+  }, [loginRateLimit.requiresCaptcha]);
 
   // Helper function to redirect based on onboarding status
   const redirectAfterAuth = async (userId: string) => {
@@ -205,6 +224,30 @@ const Auth = () => {
       });
       return;
     }
+
+    // Check CAPTCHA if required
+    let captchaSolved = false;
+    if (loginRateLimit.requiresCaptcha) {
+      if (!loginCaptcha.userAnswer) {
+        toast({
+          variant: "destructive",
+          title: "Security Verification Required",
+          description: "Please solve the math problem to continue.",
+        });
+        return;
+      }
+      
+      if (parseInt(loginCaptcha.userAnswer) !== loginCaptcha.answer) {
+        toast({
+          variant: "destructive",
+          title: "Incorrect Answer",
+          description: "Please solve the math problem correctly.",
+        });
+        generateLoginCaptcha();
+        return;
+      }
+      captchaSolved = true;
+    }
     
     setIsLoading(true);
 
@@ -231,12 +274,18 @@ const Auth = () => {
       monitorAuthAttempts(email, false);
       
       // Record failed attempt to server for IP-based rate limiting
-      const rateLimitResult = await loginRateLimit.recordAttempt(false);
+      const rateLimitResult = await loginRateLimit.recordAttempt(false, captchaSolved);
       
       let errorMessage = error.message;
-      if (rateLimitResult?.message && rateLimitResult.remainingAttempts !== undefined) {
-        if (rateLimitResult.remainingAttempts <= 2 && rateLimitResult.remainingAttempts > 0) {
-          errorMessage = `${error.message}. Warning: ${rateLimitResult.remainingAttempts} attempts remaining.`;
+      if (rateLimitResult?.requiresCaptcha && !captchaSolved) {
+        errorMessage = `${error.message}. Please complete security verification to continue.`;
+        generateLoginCaptcha();
+      } else if (rateLimitResult?.message && rateLimitResult.captchaAttemptsRemaining !== undefined) {
+        if (rateLimitResult.captchaAttemptsRemaining <= 3 && rateLimitResult.captchaAttemptsRemaining > 0) {
+          errorMessage = `${error.message}. ${rateLimitResult.captchaAttemptsRemaining} attempts remaining before lockout.`;
+        }
+        if (rateLimitResult.requiresCaptcha) {
+          generateLoginCaptcha();
         }
       }
       
@@ -249,6 +298,9 @@ const Auth = () => {
     } else if (data.session) {
       // Record successful attempt to reset rate limit
       await loginRateLimit.recordAttempt(true);
+      
+      // Reset login captcha state
+      setLoginCaptcha({ question: "", answer: 0, userAnswer: "" });
       
       monitorAuthAttempts(email, true);
       toast({
@@ -390,12 +442,24 @@ const Auth = () => {
             </Alert>
           )}
           
-          {/* Low Attempts Warning */}
-          {!loginRateLimit.isBlocked && loginRateLimit.remainingAttempts !== null && loginRateLimit.remainingAttempts <= 2 && (
+          {/* CAPTCHA Required Warning */}
+          {!loginRateLimit.isBlocked && loginRateLimit.requiresCaptcha && (
+            <Alert variant="default" className="mb-4 border-orange-500/50 bg-orange-500/10">
+              <ShieldAlert className="h-4 w-4 text-orange-600" />
+              <AlertDescription className="text-orange-700 dark:text-orange-400">
+                Security verification required. {loginRateLimit.captchaAttemptsRemaining !== null && loginRateLimit.captchaAttemptsRemaining > 0 
+                  ? `${loginRateLimit.captchaAttemptsRemaining} attempts remaining before lockout.`
+                  : 'Complete the verification below to continue.'}
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {/* Low Attempts Warning (before CAPTCHA) */}
+          {!loginRateLimit.isBlocked && !loginRateLimit.requiresCaptcha && loginRateLimit.remainingAttempts !== null && loginRateLimit.remainingAttempts <= 2 && (
             <Alert variant="default" className="mb-4 border-yellow-500/50 bg-yellow-500/10">
               <ShieldAlert className="h-4 w-4 text-yellow-600" />
               <AlertDescription className="text-yellow-700 dark:text-yellow-400">
-                Warning: {loginRateLimit.remainingAttempts} login attempt{loginRateLimit.remainingAttempts !== 1 ? 's' : ''} remaining before temporary lockout.
+                Warning: {loginRateLimit.remainingAttempts} login attempt{loginRateLimit.remainingAttempts !== 1 ? 's' : ''} remaining before security verification required.
               </AlertDescription>
             </Alert>
           )}
@@ -430,6 +494,40 @@ const Auth = () => {
                     disabled={isLoading}
                   />
                 </div>
+                
+                {/* Login CAPTCHA - shown after 3 failed attempts */}
+                {loginRateLimit.requiresCaptcha && (
+                  <div className="space-y-2 p-3 border border-orange-500/30 rounded-md bg-orange-500/5">
+                    <Label htmlFor="login-captcha" className="text-sm font-medium flex items-center gap-2">
+                      <ShieldAlert className="h-4 w-4 text-orange-600" />
+                      Security Verification
+                    </Label>
+                    <div className="flex items-center space-x-2">
+                      <div className="flex items-center space-x-2 flex-1">
+                        <span className="text-sm font-medium">{loginCaptcha.question}</span>
+                        <Input
+                          id="login-captcha"
+                          type="number"
+                          placeholder="Answer"
+                          value={loginCaptcha.userAnswer}
+                          onChange={(e) => setLoginCaptcha(prev => ({ ...prev, userAnswer: e.target.value }))}
+                          disabled={isLoading}
+                          className="w-20"
+                        />
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        onClick={generateLoginCaptcha}
+                        disabled={isLoading}
+                      >
+                        <RefreshCw className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                )}
+                
                 <Button 
                   type="submit" 
                   className="w-full" 
