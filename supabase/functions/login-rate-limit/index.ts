@@ -6,23 +6,26 @@ import { corsHeaders } from "../_shared/corsHeaders.ts";
  * Login Rate Limiting Configuration
  * 
  * Based on OWASP and NIST guidelines:
- * - 5 failed attempts triggers a 15-minute block
- * - 10 failed attempts triggers a 1-hour block
- * - 20+ failed attempts triggers a 24-hour block
+ * - 3 failed attempts triggers CAPTCHA requirement
+ * - 8 failed attempts (after CAPTCHA) triggers a 15-minute block
+ * - 15 failed attempts triggers a 1-hour block
+ * - 25+ failed attempts triggers a 24-hour block
  * - Rate limit window resets after successful login
  */
 const RATE_LIMIT_CONFIG = {
   WINDOW_MINUTES: 15,
+  CAPTCHA_THRESHOLD: 3, // Show CAPTCHA after 3 failed attempts
   THRESHOLDS: [
-    { attempts: 5, blockMinutes: 15 },
-    { attempts: 10, blockMinutes: 60 },
-    { attempts: 20, blockMinutes: 1440 } // 24 hours
+    { attempts: 8, blockMinutes: 15 },
+    { attempts: 15, blockMinutes: 60 },
+    { attempts: 25, blockMinutes: 1440 } // 24 hours
   ]
 };
 
 interface RateLimitRequest {
   action: 'check' | 'record_attempt' | 'reset';
   success?: boolean;
+  captchaSolved?: boolean;
 }
 
 interface RateLimitResponse {
@@ -32,6 +35,8 @@ interface RateLimitResponse {
   remainingAttempts?: number;
   retryAfterSeconds?: number;
   message?: string;
+  requiresCaptcha?: boolean;
+  captchaAttemptsRemaining?: number;
 }
 
 const logStep = (step: string, details?: any) => {
@@ -116,15 +121,23 @@ serve(async (req) => {
 
         // Calculate remaining attempts before next block
         const currentAttempts = rateLimitRecord?.failed_attempts || 0;
+        const requiresCaptcha = currentAttempts >= RATE_LIMIT_CONFIG.CAPTCHA_THRESHOLD;
         const nextThreshold = RATE_LIMIT_CONFIG.THRESHOLDS.find(t => t.attempts > currentAttempts);
         const remainingAttempts = nextThreshold 
           ? nextThreshold.attempts - currentAttempts 
           : 0;
+        
+        // Calculate attempts remaining before block (after CAPTCHA kicks in)
+        const captchaAttemptsRemaining = requiresCaptcha 
+          ? RATE_LIMIT_CONFIG.THRESHOLDS[0].attempts - currentAttempts
+          : RATE_LIMIT_CONFIG.CAPTCHA_THRESHOLD - currentAttempts;
 
         const response: RateLimitResponse = {
           allowed: true,
           blocked: false,
-          remainingAttempts
+          remainingAttempts,
+          requiresCaptcha,
+          captchaAttemptsRemaining: Math.max(0, captchaAttemptsRemaining)
         };
 
         return new Response(JSON.stringify(response), {
@@ -133,6 +146,8 @@ serve(async (req) => {
       }
 
       case 'record_attempt': {
+        const { captchaSolved } = body;
+        
         if (success) {
           // Successful login - reset rate limit
           if (rateLimitRecord) {
@@ -152,6 +167,7 @@ serve(async (req) => {
           return new Response(JSON.stringify({ 
             allowed: true, 
             blocked: false,
+            requiresCaptcha: false,
             message: 'Rate limit reset on successful login'
           }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -184,9 +200,14 @@ serve(async (req) => {
           firstFailedAt = now.toISOString();
         }
 
-        // Calculate if we should block
+        // Check if CAPTCHA is required
+        const requiresCaptcha = newFailedAttempts >= RATE_LIMIT_CONFIG.CAPTCHA_THRESHOLD;
+        
+        // Only block if CAPTCHA was required and they still failed
+        // OR if they've exceeded the hard block threshold
         const blockMinutes = getBlockDuration(newFailedAttempts);
-        const blockedUntil = blockMinutes > 0 
+        const shouldBlock = blockMinutes > 0 && (captchaSolved || !requiresCaptcha);
+        const blockedUntil = shouldBlock
           ? new Date(now.getTime() + blockMinutes * 60 * 1000).toISOString()
           : null;
 
@@ -216,7 +237,7 @@ serve(async (req) => {
             device_type: 'Unknown',
             browser: 'Unknown',
             success: false,
-            failure_reason: blockedUntil ? 'Rate limited' : 'Invalid credentials'
+            failure_reason: blockedUntil ? 'Rate limited' : requiresCaptcha ? 'CAPTCHA required' : 'Invalid credentials'
           });
 
         if (blockedUntil) {
@@ -232,6 +253,7 @@ serve(async (req) => {
             blocked: true,
             blockedUntil,
             retryAfterSeconds,
+            requiresCaptcha: false,
             message: `Too many failed attempts. Account locked for ${blockMinutes} minutes.`
           }), {
             status: 429,
@@ -247,19 +269,28 @@ serve(async (req) => {
         const remainingAttempts = nextThreshold 
           ? nextThreshold.attempts - newFailedAttempts 
           : 0;
+        
+        const captchaAttemptsRemaining = requiresCaptcha 
+          ? RATE_LIMIT_CONFIG.THRESHOLDS[0].attempts - newFailedAttempts
+          : RATE_LIMIT_CONFIG.CAPTCHA_THRESHOLD - newFailedAttempts;
 
         logStep('Failed attempt recorded', { 
           attempts: newFailedAttempts, 
-          remainingAttempts 
+          remainingAttempts,
+          requiresCaptcha
         });
 
         return new Response(JSON.stringify({
           allowed: true,
           blocked: false,
           remainingAttempts,
-          message: remainingAttempts <= 2 
-            ? `Warning: ${remainingAttempts} attempts remaining before account lock`
-            : undefined
+          requiresCaptcha,
+          captchaAttemptsRemaining: Math.max(0, captchaAttemptsRemaining),
+          message: requiresCaptcha 
+            ? `Please complete the security verification. ${Math.max(0, captchaAttemptsRemaining)} attempts remaining before lockout.`
+            : remainingAttempts <= 2 
+              ? `Warning: ${remainingAttempts} attempts remaining before CAPTCHA required`
+              : undefined
         }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });

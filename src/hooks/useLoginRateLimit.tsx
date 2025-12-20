@@ -7,6 +7,8 @@ interface LoginRateLimitState {
   remainingAttempts: number | null;
   retryAfterSeconds: number;
   warningMessage: string | null;
+  requiresCaptcha: boolean;
+  captchaAttemptsRemaining: number | null;
 }
 
 interface RateLimitResponse {
@@ -16,6 +18,8 @@ interface RateLimitResponse {
   remainingAttempts?: number;
   retryAfterSeconds?: number;
   message?: string;
+  requiresCaptcha?: boolean;
+  captchaAttemptsRemaining?: number;
 }
 
 export function useLoginRateLimit() {
@@ -24,7 +28,9 @@ export function useLoginRateLimit() {
     blockedUntil: null,
     remainingAttempts: null,
     retryAfterSeconds: 0,
-    warningMessage: null
+    warningMessage: null,
+    requiresCaptcha: false,
+    captchaAttemptsRemaining: null
   });
   
   const countdownRef = useRef<NodeJS.Timeout | null>(null);
@@ -42,7 +48,9 @@ export function useLoginRateLimit() {
               isBlocked: false,
               blockedUntil: null,
               retryAfterSeconds: 0,
-              warningMessage: null
+              warningMessage: null,
+              requiresCaptcha: false,
+              captchaAttemptsRemaining: null
             };
           }
           return { ...prev, retryAfterSeconds: newRetry };
@@ -72,7 +80,9 @@ export function useLoginRateLimit() {
           blockedUntil: new Date(data.blockedUntil),
           remainingAttempts: 0,
           retryAfterSeconds: data.retryAfterSeconds || 0,
-          warningMessage: data.message || null
+          warningMessage: data.message || null,
+          requiresCaptcha: false,
+          captchaAttemptsRemaining: null
         });
         return false;
       }
@@ -80,7 +90,9 @@ export function useLoginRateLimit() {
       setState(prev => ({
         ...prev,
         isBlocked: false,
-        remainingAttempts: data.remainingAttempts ?? null
+        remainingAttempts: data.remainingAttempts ?? null,
+        requiresCaptcha: data.requiresCaptcha ?? false,
+        captchaAttemptsRemaining: data.captchaAttemptsRemaining ?? null
       }));
 
       return true;
@@ -90,10 +102,10 @@ export function useLoginRateLimit() {
     }
   }, []);
 
-  const recordAttempt = useCallback(async (success: boolean): Promise<RateLimitResponse | null> => {
+  const recordAttempt = useCallback(async (success: boolean, captchaSolved?: boolean): Promise<RateLimitResponse | null> => {
     try {
       const { data, error } = await supabase.functions.invoke<RateLimitResponse>('login-rate-limit', {
-        body: { action: 'record_attempt', success }
+        body: { action: 'record_attempt', success, captchaSolved }
       });
 
       if (error) {
@@ -107,14 +119,18 @@ export function useLoginRateLimit() {
           blockedUntil: new Date(data.blockedUntil),
           remainingAttempts: 0,
           retryAfterSeconds: data.retryAfterSeconds || 0,
-          warningMessage: data.message || null
+          warningMessage: data.message || null,
+          requiresCaptcha: false,
+          captchaAttemptsRemaining: null
         });
       } else if (data) {
         setState(prev => ({
           ...prev,
           isBlocked: false,
           remainingAttempts: data.remainingAttempts ?? null,
-          warningMessage: data.message || null
+          warningMessage: data.message || null,
+          requiresCaptcha: data.requiresCaptcha ?? false,
+          captchaAttemptsRemaining: data.captchaAttemptsRemaining ?? null
         }));
       }
 
@@ -144,7 +160,9 @@ export function useLoginRateLimit() {
       blockedUntil: null,
       remainingAttempts: null,
       retryAfterSeconds: 0,
-      warningMessage: null
+      warningMessage: null,
+      requiresCaptcha: false,
+      captchaAttemptsRemaining: null
     });
   }, []);
 
