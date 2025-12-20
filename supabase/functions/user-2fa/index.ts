@@ -2,7 +2,109 @@ import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { corsHeaders } from "../_shared/corsHeaders.ts";
 
-// TOTP implementation using Web Crypto API
+// ============================================================
+// AES-GCM Encryption Implementation (Inline for Edge Function)
+// ============================================================
+
+const ALGORITHM = 'AES-GCM';
+const KEY_LENGTH = 256;
+const IV_LENGTH = 12;
+const TAG_LENGTH = 128;
+const CURRENT_KEY_VERSION = 2; // Version 2 = AES-GCM (Version 1 was XOR)
+
+async function deriveKey(secret: string, salt: Uint8Array): Promise<CryptoKey> {
+  const encoder = new TextEncoder();
+  const keyMaterial = await crypto.subtle.importKey(
+    'raw',
+    encoder.encode(secret),
+    'PBKDF2',
+    false,
+    ['deriveKey']
+  );
+
+  return crypto.subtle.deriveKey(
+    {
+      name: 'PBKDF2',
+      salt,
+      iterations: 100000,
+      hash: 'SHA-256'
+    },
+    keyMaterial,
+    { name: ALGORITHM, length: KEY_LENGTH },
+    false,
+    ['encrypt', 'decrypt']
+  );
+}
+
+async function encryptAesGcm(plaintext: string, secret: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const iv = crypto.getRandomValues(new Uint8Array(IV_LENGTH));
+  const key = await deriveKey(secret, salt);
+  
+  const encrypted = await crypto.subtle.encrypt(
+    { name: ALGORITHM, iv, tagLength: TAG_LENGTH },
+    key,
+    encoder.encode(plaintext)
+  );
+  
+  const result = new Uint8Array(1 + salt.length + iv.length + encrypted.byteLength);
+  result[0] = CURRENT_KEY_VERSION;
+  result.set(salt, 1);
+  result.set(iv, 1 + salt.length);
+  result.set(new Uint8Array(encrypted), 1 + salt.length + iv.length);
+  
+  return btoa(String.fromCharCode(...result));
+}
+
+async function decryptAesGcm(encryptedData: string, secret: string): Promise<string> {
+  const decoder = new TextDecoder();
+  const combined = new Uint8Array(atob(encryptedData).split('').map(c => c.charCodeAt(0)));
+  
+  const version = combined[0];
+  
+  // Handle legacy XOR encryption (version 1 or missing version byte)
+  if (version !== CURRENT_KEY_VERSION) {
+    return decryptLegacyXor(encryptedData, secret);
+  }
+  
+  const salt = combined.slice(1, 17);
+  const iv = combined.slice(17, 17 + IV_LENGTH);
+  const ciphertext = combined.slice(17 + IV_LENGTH);
+  
+  const key = await deriveKey(secret, salt);
+  
+  const decrypted = await crypto.subtle.decrypt(
+    { name: ALGORITHM, iv, tagLength: TAG_LENGTH },
+    key,
+    ciphertext
+  );
+  
+  return decoder.decode(decrypted);
+}
+
+function decryptLegacyXor(encrypted: string, key: string): string {
+  const decoded = atob(encrypted);
+  let result = '';
+  for (let i = 0; i < decoded.length; i++) {
+    result += String.fromCharCode(decoded.charCodeAt(i) ^ key.charCodeAt(i % key.length));
+  }
+  return result;
+}
+
+function isLegacyEncryption(encryptedData: string): boolean {
+  try {
+    const decoded = atob(encryptedData);
+    return decoded.charCodeAt(0) !== CURRENT_KEY_VERSION;
+  } catch {
+    return true;
+  }
+}
+
+// ============================================================
+// TOTP Implementation
+// ============================================================
+
 const BASE32_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
 
 function generateSecret(length = 20): string {
@@ -93,22 +195,9 @@ function generateBackupCodes(count = 10): string[] {
   return codes;
 }
 
-function encryptData(data: string, key: string): string {
-  let result = '';
-  for (let i = 0; i < data.length; i++) {
-    result += String.fromCharCode(data.charCodeAt(i) ^ key.charCodeAt(i % key.length));
-  }
-  return btoa(result);
-}
-
-function decryptData(encrypted: string, key: string): string {
-  const decoded = atob(encrypted);
-  let result = '';
-  for (let i = 0; i < decoded.length; i++) {
-    result += String.fromCharCode(decoded.charCodeAt(i) ^ key.charCodeAt(i % key.length));
-  }
-  return result;
-}
+// ============================================================
+// Main Handler
+// ============================================================
 
 const logStep = (step: string, details?: any) => {
   console.log(`[USER-2FA] ${step}`, details ? JSON.stringify(details) : '');
@@ -122,7 +211,8 @@ serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const encryptionKey = serviceRoleKey.slice(0, 32);
+    // Use a stronger key derivation from service role key
+    const encryptionKey = serviceRoleKey;
     
     const supabase = createClient(supabaseUrl, serviceRoleKey, {
       auth: { persistSession: false }
@@ -148,12 +238,8 @@ serve(async (req) => {
     }
 
     const { action, ...params } = await req.json();
-    const ipAddress = req.headers.get('x-forwarded-for') || req.headers.get('cf-connecting-ip');
-    const userAgent = req.headers.get('user-agent');
-
     logStep(`Action: ${action}`, { userId: user.id.slice(0, 8) });
 
-    // User 2FA uses the same table structure but for regular users
     const tableName = 'user_totp';
 
     switch (action) {
@@ -161,8 +247,11 @@ serve(async (req) => {
         const secret = generateSecret(20);
         const backupCodes = generateBackupCodes(10);
         
-        const encryptedSecret = encryptData(secret, encryptionKey);
-        const encryptedBackupCodes = backupCodes.map(code => encryptData(code, encryptionKey));
+        // Use AES-GCM encryption
+        const encryptedSecret = await encryptAesGcm(secret, encryptionKey);
+        const encryptedBackupCodes = await Promise.all(
+          backupCodes.map(code => encryptAesGcm(code, encryptionKey))
+        );
         
         const { error: insertError } = await supabase
           .from(tableName)
@@ -180,7 +269,7 @@ serve(async (req) => {
         const issuer = 'MiniDrama';
         const uri = `otpauth://totp/${issuer}:${email}?secret=${secret}&issuer=${issuer}&algorithm=SHA1&digits=6&period=30`;
         
-        logStep('2FA setup initiated', { userId: user.id.slice(0, 8) });
+        logStep('2FA setup initiated with AES-GCM encryption', { userId: user.id.slice(0, 8) });
         
         return new Response(
           JSON.stringify({
@@ -217,7 +306,8 @@ serve(async (req) => {
           );
         }
         
-        const secret = decryptData(totpData.secret_encrypted, encryptionKey);
+        // Decrypt with AES-GCM (automatically handles legacy XOR)
+        const secret = await decryptAesGcm(totpData.secret_encrypted, encryptionKey);
         const isValid = await verifyTOTP(secret, code);
         
         if (!isValid) {
@@ -227,15 +317,38 @@ serve(async (req) => {
           );
         }
         
-        await supabase
-          .from(tableName)
-          .update({
-            is_enabled: true,
-            verified_at: new Date().toISOString()
-          })
-          .eq('user_id', user.id);
-        
-        logStep('2FA enabled successfully', { userId: user.id.slice(0, 8) });
+        // If using legacy encryption, upgrade to AES-GCM
+        if (isLegacyEncryption(totpData.secret_encrypted)) {
+          const upgradedSecret = await encryptAesGcm(secret, encryptionKey);
+          const decryptedBackups = await Promise.all(
+            (totpData.backup_codes || []).map((c: string) => decryptAesGcm(c, encryptionKey))
+          );
+          const upgradedBackups = await Promise.all(
+            decryptedBackups.map(c => encryptAesGcm(c, encryptionKey))
+          );
+          
+          await supabase
+            .from(tableName)
+            .update({
+              secret_encrypted: upgradedSecret,
+              backup_codes: upgradedBackups,
+              is_enabled: true,
+              verified_at: new Date().toISOString()
+            })
+            .eq('user_id', user.id);
+          
+          logStep('2FA enabled and upgraded to AES-GCM', { userId: user.id.slice(0, 8) });
+        } else {
+          await supabase
+            .from(tableName)
+            .update({
+              is_enabled: true,
+              verified_at: new Date().toISOString()
+            })
+            .eq('user_id', user.id);
+          
+          logStep('2FA enabled successfully', { userId: user.id.slice(0, 8) });
+        }
         
         return new Response(
           JSON.stringify({ success: true, message: '2FA enabled successfully' }),
@@ -267,12 +380,14 @@ serve(async (req) => {
           );
         }
         
-        const secret = decryptData(totpData.secret_encrypted, encryptionKey);
+        const secret = await decryptAesGcm(totpData.secret_encrypted, encryptionKey);
         
         // Check backup codes
         if (code.length === 10) {
           const encryptedBackupCodes = totpData.backup_codes || [];
-          const decryptedCodes = encryptedBackupCodes.map((c: string) => decryptData(c, encryptionKey));
+          const decryptedCodes = await Promise.all(
+            encryptedBackupCodes.map((c: string) => decryptAesGcm(c, encryptionKey))
+          );
           const codeIndex = decryptedCodes.indexOf(code.toUpperCase());
           
           if (codeIndex !== -1) {
@@ -321,16 +436,24 @@ serve(async (req) => {
       case 'status': {
         const { data: totpData } = await supabase
           .from(tableName)
-          .select('is_enabled, verified_at, last_used_at, backup_codes')
+          .select('is_enabled, verified_at, last_used_at, backup_codes, secret_encrypted')
           .eq('user_id', user.id)
           .single();
+        
+        // Check encryption version for status
+        const encryptionVersion = totpData?.secret_encrypted && !isLegacyEncryption(totpData.secret_encrypted) 
+          ? 'AES-GCM' 
+          : totpData?.secret_encrypted 
+            ? 'Legacy (upgrade recommended)' 
+            : null;
         
         return new Response(
           JSON.stringify({
             enabled: totpData?.is_enabled || false,
             verifiedAt: totpData?.verified_at,
             lastUsedAt: totpData?.last_used_at,
-            backupCodesRemaining: totpData?.backup_codes?.length || 0
+            backupCodesRemaining: totpData?.backup_codes?.length || 0,
+            encryptionVersion
           }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
@@ -360,7 +483,7 @@ serve(async (req) => {
           );
         }
         
-        const secret = decryptData(totpData.secret_encrypted, encryptionKey);
+        const secret = await decryptAesGcm(totpData.secret_encrypted, encryptionKey);
         const isValid = await verifyTOTP(secret, code);
         
         if (!isValid) {
@@ -407,7 +530,7 @@ serve(async (req) => {
           );
         }
         
-        const secret = decryptData(totpData.secret_encrypted, encryptionKey);
+        const secret = await decryptAesGcm(totpData.secret_encrypted, encryptionKey);
         const isValid = await verifyTOTP(secret, code);
         
         if (!isValid) {
@@ -418,17 +541,68 @@ serve(async (req) => {
         }
         
         const newBackupCodes = generateBackupCodes(10);
-        const encryptedCodes = newBackupCodes.map(c => encryptData(c, encryptionKey));
+        const encryptedCodes = await Promise.all(
+          newBackupCodes.map(c => encryptAesGcm(c, encryptionKey))
+        );
         
         await supabase
           .from(tableName)
           .update({ backup_codes: encryptedCodes })
           .eq('user_id', user.id);
         
-        logStep('Backup codes regenerated', { userId: user.id.slice(0, 8) });
+        logStep('Backup codes regenerated with AES-GCM', { userId: user.id.slice(0, 8) });
         
         return new Response(
           JSON.stringify({ success: true, backupCodes: newBackupCodes }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      
+      case 'rotate-encryption': {
+        // This action upgrades legacy XOR encryption to AES-GCM
+        const { data: totpData } = await supabase
+          .from(tableName)
+          .select('*')
+          .eq('user_id', user.id)
+          .single();
+        
+        if (!totpData) {
+          return new Response(
+            JSON.stringify({ error: '2FA not configured' }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+        
+        if (!isLegacyEncryption(totpData.secret_encrypted)) {
+          return new Response(
+            JSON.stringify({ success: true, message: 'Already using latest encryption' }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+        
+        // Decrypt and re-encrypt with AES-GCM
+        const secret = await decryptAesGcm(totpData.secret_encrypted, encryptionKey);
+        const upgradedSecret = await encryptAesGcm(secret, encryptionKey);
+        
+        const decryptedBackups = await Promise.all(
+          (totpData.backup_codes || []).map((c: string) => decryptAesGcm(c, encryptionKey))
+        );
+        const upgradedBackups = await Promise.all(
+          decryptedBackups.map(c => encryptAesGcm(c, encryptionKey))
+        );
+        
+        await supabase
+          .from(tableName)
+          .update({
+            secret_encrypted: upgradedSecret,
+            backup_codes: upgradedBackups
+          })
+          .eq('user_id', user.id);
+        
+        logStep('Encryption rotated to AES-GCM', { userId: user.id.slice(0, 8) });
+        
+        return new Response(
+          JSON.stringify({ success: true, message: 'Encryption upgraded to AES-GCM' }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }

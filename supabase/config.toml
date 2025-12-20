@@ -75,3 +75,9 @@ verify_jwt = true
 
 [functions.delete-account]
 verify_jwt = true
+
+[functions.log-login-activity]
+verify_jwt = true
+
+[functions.get-login-activity]
+verify_jwt = true
