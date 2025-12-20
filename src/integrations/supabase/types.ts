@@ -777,6 +777,36 @@ export type Database = {
           },
         ]
       }
+      security_alerts: {
+        Row: {
+          alert_type: string
+          created_at: string | null
+          email_sent: boolean | null
+          id: string
+          ip_address: unknown
+          metadata: Json | null
+          user_id: string
+        }
+        Insert: {
+          alert_type: string
+          created_at?: string | null
+          email_sent?: boolean | null
+          id?: string
+          ip_address?: unknown
+          metadata?: Json | null
+          user_id: string
+        }
+        Update: {
+          alert_type?: string
+          created_at?: string | null
+          email_sent?: boolean | null
+          id?: string
+          ip_address?: unknown
+          metadata?: Json | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       series: {
         Row: {
           created_at: string | null

@@ -84,3 +84,6 @@ verify_jwt = true
 
 [functions.login-rate-limit]
 verify_jwt = false
+
+[functions.send-security-alert]
+verify_jwt = false
