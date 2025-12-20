@@ -8,10 +8,12 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, HelpCircle, Mail, Phone, MapPin, RefreshCw } from "lucide-react";
+import { Loader2, HelpCircle, Mail, Phone, MapPin, RefreshCw, ShieldAlert, Clock } from "lucide-react";
 import { useSecurityMonitoring } from "@/hooks/useSecurityMonitoring";
 import { useRateLimit } from "@/hooks/useRateLimit";
+import { useLoginRateLimit } from "@/hooks/useLoginRateLimit";
 import { SecurityIndicator } from "@/components/SecurityIndicator";
 import { signUpSchema, loginSchema, passwordResetSchema } from "@/lib/authValidation";
 import { useAuth } from "@/hooks/useAuth";
@@ -46,9 +48,15 @@ const Auth = () => {
   const { profile, profileLoading } = useAuth();
   const { monitorAuthAttempts, monitorSuspiciousActivity } = useSecurityMonitoring();
   const authRateLimit = useRateLimit({ maxAttempts: 5, windowMs: 15 * 60 * 1000, identifier: 'auth' });
+  const loginRateLimit = useLoginRateLimit();
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [isAppleLoading, setIsAppleLoading] = useState(false);
   const passwordResetRateLimit = useRateLimit({ maxAttempts: 3, windowMs: 5 * 60 * 1000, identifier: 'password-reset' });
+
+  // Check server-side rate limit on mount
+  useEffect(() => {
+    loginRateLimit.checkRateLimit();
+  }, []);
 
   // Generate simple math captcha
   const generateCaptcha = () => {
@@ -177,7 +185,17 @@ const Auth = () => {
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Check rate limiting
+    // Check server-side IP rate limiting first
+    if (loginRateLimit.isBlocked) {
+      toast({
+        variant: "destructive",
+        title: "Account Temporarily Locked",
+        description: loginRateLimit.warningMessage || `Too many failed attempts. Try again in ${loginRateLimit.formatTimeRemaining()}.`,
+      });
+      return;
+    }
+    
+    // Check client-side rate limiting
     const rateLimitCheck = authRateLimit.checkRateLimit();
     if (!rateLimitCheck.allowed) {
       toast({
@@ -211,13 +229,27 @@ const Auth = () => {
 
     if (error) {
       monitorAuthAttempts(email, false);
+      
+      // Record failed attempt to server for IP-based rate limiting
+      const rateLimitResult = await loginRateLimit.recordAttempt(false);
+      
+      let errorMessage = error.message;
+      if (rateLimitResult?.message && rateLimitResult.remainingAttempts !== undefined) {
+        if (rateLimitResult.remainingAttempts <= 2 && rateLimitResult.remainingAttempts > 0) {
+          errorMessage = `${error.message}. Warning: ${rateLimitResult.remainingAttempts} attempts remaining.`;
+        }
+      }
+      
       toast({
         title: "Sign In Failed",
-        description: error.message,
+        description: errorMessage,
         variant: "destructive",
       });
       setIsLoading(false);
     } else if (data.session) {
+      // Record successful attempt to reset rate limit
+      await loginRateLimit.recordAttempt(true);
+      
       monitorAuthAttempts(email, true);
       toast({
         title: "Welcome back!",
@@ -344,6 +376,30 @@ const Auth = () => {
           </div>
         </CardHeader>
         <CardContent>
+          {/* IP Block Warning */}
+          {loginRateLimit.isBlocked && (
+            <Alert variant="destructive" className="mb-4">
+              <ShieldAlert className="h-4 w-4" />
+              <AlertDescription className="flex items-center justify-between">
+                <span>Account locked due to too many failed attempts.</span>
+                <span className="flex items-center gap-1 font-mono">
+                  <Clock className="h-4 w-4" />
+                  {loginRateLimit.formatTimeRemaining()}
+                </span>
+              </AlertDescription>
+            </Alert>
+          )}
+          
+          {/* Low Attempts Warning */}
+          {!loginRateLimit.isBlocked && loginRateLimit.remainingAttempts !== null && loginRateLimit.remainingAttempts <= 2 && (
+            <Alert variant="default" className="mb-4 border-yellow-500/50 bg-yellow-500/10">
+              <ShieldAlert className="h-4 w-4 text-yellow-600" />
+              <AlertDescription className="text-yellow-700 dark:text-yellow-400">
+                Warning: {loginRateLimit.remainingAttempts} login attempt{loginRateLimit.remainingAttempts !== 1 ? 's' : ''} remaining before temporary lockout.
+              </AlertDescription>
+            </Alert>
+          )}
+          
           <Tabs defaultValue="signin" className="space-y-4">
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="signin">Sign In</TabsTrigger>
@@ -374,9 +430,13 @@ const Auth = () => {
                     disabled={isLoading}
                   />
                 </div>
-                <Button type="submit" className="w-full" disabled={isLoading}>
+                <Button 
+                  type="submit" 
+                  className="w-full" 
+                  disabled={isLoading || loginRateLimit.isBlocked}
+                >
                   {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Sign In
+                  {loginRateLimit.isBlocked ? `Locked (${loginRateLimit.formatTimeRemaining()})` : 'Sign In'}
                 </Button>
                 <div className="text-center">
                   <Button

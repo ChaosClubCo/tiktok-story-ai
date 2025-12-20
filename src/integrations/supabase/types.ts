@@ -354,6 +354,36 @@ export type Database = {
         }
         Relationships: []
       }
+      login_rate_limits: {
+        Row: {
+          blocked_until: string | null
+          created_at: string
+          failed_attempts: number
+          first_failed_at: string | null
+          id: string
+          ip_address: unknown
+          last_attempt_at: string
+        }
+        Insert: {
+          blocked_until?: string | null
+          created_at?: string
+          failed_attempts?: number
+          first_failed_at?: string | null
+          id?: string
+          ip_address: unknown
+          last_attempt_at?: string
+        }
+        Update: {
+          blocked_until?: string | null
+          created_at?: string
+          failed_attempts?: number
+          first_failed_at?: string | null
+          id?: string
+          ip_address?: unknown
+          last_attempt_at?: string
+        }
+        Relationships: []
+      }
       notification_preferences: {
         Row: {
           created_at: string
@@ -1060,6 +1090,7 @@ export type Database = {
     }
     Functions: {
       ab_test_owner_id: { Args: { p_test: string }; Returns: string }
+      cleanup_expired_rate_limits: { Args: never; Returns: undefined }
       has_role:
         | {
             Args: {
