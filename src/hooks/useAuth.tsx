@@ -8,13 +8,22 @@ interface SubscriptionData {
   subscription_end?: string;
 }
 
+interface ProfileData {
+  onboarding_completed: boolean;
+  preferred_niche?: string;
+  goals?: string[];
+}
+
 interface AuthContextType {
   user: User | null;
   session: Session | null;
   loading: boolean;
   subscription: SubscriptionData | null;
   subscriptionLoading: boolean;
+  profile: ProfileData | null;
+  profileLoading: boolean;
   checkSubscription: () => Promise<void>;
+  checkProfile: () => Promise<void>;
   signOut: () => Promise<void>;
 }
 
@@ -26,6 +35,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const [subscription, setSubscription] = useState<SubscriptionData | null>(null);
   const [subscriptionLoading, setSubscriptionLoading] = useState(false);
+  const [profile, setProfile] = useState<ProfileData | null>(null);
+  const [profileLoading, setProfileLoading] = useState(false);
 
   const checkSubscription = async () => {
     if (!session) return;
@@ -46,6 +57,27 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
+  const checkProfile = async () => {
+    if (!user) return;
+    
+    setProfileLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('onboarding_completed, preferred_niche, goals')
+        .eq('user_id', user.id)
+        .single();
+      
+      if (error) throw error;
+      setProfile(data);
+    } catch (error) {
+      console.error('Failed to check profile:', error);
+      setProfile({ onboarding_completed: false });
+    } finally {
+      setProfileLoading(false);
+    }
+  };
+
   useEffect(() => {
     // Set up auth state listener FIRST
     const { data: { subscription: authSubscription } } = supabase.auth.onAuthStateChange(
@@ -54,16 +86,18 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         setUser(session?.user ?? null);
         setLoading(false);
         
-        // Check subscription when user logs in
+        // Check subscription and profile when user logs in
         if (session?.user && event === 'SIGNED_IN') {
           setTimeout(() => {
             checkSubscription();
+            checkProfile();
           }, 0);
         }
         
-        // Clear subscription when user logs out
+        // Clear data when user logs out
         if (!session) {
           setSubscription(null);
+          setProfile(null);
         }
       }
     );
@@ -74,10 +108,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setUser(session?.user ?? null);
       setLoading(false);
       
-      // Check subscription for existing session
+      // Check subscription and profile for existing session
       if (session?.user) {
         setTimeout(() => {
           checkSubscription();
+          checkProfile();
         }, 0);
       }
     });
@@ -95,7 +130,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     loading,
     subscription,
     subscriptionLoading,
+    profile,
+    profileLoading,
     checkSubscription,
+    checkProfile,
     signOut,
   };
 

@@ -43,7 +43,7 @@ export const ScriptControls = ({
             {lengths.map((len) => (
               <Button
                 key={len}
-                variant={length === len ? "drama" : "niche"}
+                variant={length === len ? "drama" : "outline"}
                 size="sm"
                 onClick={() => onLengthChange(len)}
                 className="flex-1"
@@ -61,7 +61,7 @@ export const ScriptControls = ({
             {tones.map((t) => (
               <Button
                 key={t.id}
-                variant={tone === t.id ? "drama" : "niche"}
+                variant={tone === t.id ? "drama" : "outline"}
                 size="sm"
                 onClick={() => onToneChange(t.id)}
                 className="text-xs"
