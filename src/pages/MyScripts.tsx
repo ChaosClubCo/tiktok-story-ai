@@ -13,6 +13,7 @@ import { Header } from "@/components/Header";
 import { ScriptVersionHistory } from "@/components/ScriptVersionHistory";
 import { useNavigate } from "react-router-dom";
 import { useAutoVersion } from "@/hooks/useAutoVersion";
+import { BranchSelector } from "@/components/branching/BranchSelector";
 
 interface SavedScript {
   id: string;
@@ -24,6 +25,7 @@ interface SavedScript {
   topic: string;
   created_at: string;
   current_version?: number;
+  active_branch_id?: string | null;
 }
 
 interface BatchAnalysisResult {
@@ -71,7 +73,7 @@ const MyScripts = () => {
     try {
       const { data, error } = await supabase
         .from('scripts')
-        .select('*')
+        .select('id, title, content, niche, length, tone, topic, created_at, current_version, active_branch_id')
         .eq('user_id', user?.id)
         .order('created_at', { ascending: false });
 
@@ -239,6 +241,15 @@ const MyScripts = () => {
     toast({
       title: "Version Restored",
       description: "Script has been restored to selected version",
+    });
+  };
+
+  const handleBranchChange = async (scriptId: string, branchId: string) => {
+    // Refetch scripts to get updated content from the new branch
+    await fetchScripts();
+    toast({
+      title: "Branch Switched",
+      description: "Script content updated to selected branch",
     });
   };
 
@@ -500,6 +511,11 @@ const MyScripts = () => {
                     </div>
                     
                     <div className="flex flex-wrap gap-2">
+                      <BranchSelector 
+                        scriptId={script.id} 
+                        currentBranchId={script.active_branch_id || null}
+                        onBranchChange={(branchId) => handleBranchChange(script.id, branchId)}
+                      />
                       <Button variant="outline" size="sm" onClick={() => handleView(script)}>
                         <Eye className="w-4 h-4 mr-2" />View
                       </Button>
