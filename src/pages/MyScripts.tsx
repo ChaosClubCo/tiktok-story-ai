@@ -245,12 +245,30 @@ const MyScripts = () => {
   };
 
   const handleBranchChange = async (scriptId: string, branchId: string) => {
-    // Refetch scripts to get updated content from the new branch
-    await fetchScripts();
-    toast({
-      title: "Branch Switched",
-      description: "Script content updated to selected branch",
-    });
+    // Refetch the specific script to get updated content from the new branch
+    try {
+      const { data, error } = await supabase
+        .from('scripts')
+        .select('id, title, content, niche, length, tone, topic, created_at, current_version, active_branch_id')
+        .eq('id', scriptId)
+        .single();
+
+      if (error) throw error;
+
+      // Update only the specific script in the state
+      setScripts(prev => prev.map(script => 
+        script.id === scriptId ? data : script
+      ));
+
+      toast({
+        title: "Branch Switched",
+        description: "Script content updated to selected branch",
+      });
+    } catch (error) {
+      console.error('Error refetching script after branch change:', error);
+      // Fallback to full refetch if targeted update fails
+      await fetchScripts();
+    }
   };
 
   const toggleSelectAll = () => {
