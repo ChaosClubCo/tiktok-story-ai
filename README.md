@@ -1,6 +1,42 @@
-# Welcome to your Lovable project
+# MiniDrama Script Generator
 
-## Project info
+A powerful AI-powered script generation platform for creating viral short-form video content.
+
+## 🚀 Features
+
+### Core Features
+- **AI Script Generation** - Generate viral scripts with customizable tone, niche, and length
+- **Viral Score Prediction** - Analyze scripts for engagement potential with detailed metrics
+- **Script Version Control** - Branch and merge scripts like code with full history
+- **A/B Testing** - Compare script variants with performance tracking
+- **Series Builder** - Create multi-episode content series
+- **Video Generation** - Generate videos from scripts with AI visuals and audio
+
+### 🔐 Security Features
+- **Login Brute-Force Protection** - Progressive rate limiting with CAPTCHA challenges
+- **Security Email Alerts** - Instant notifications for suspicious activity
+- **Two-Factor Authentication** - TOTP-based 2FA for user and admin accounts
+- **Session Management** - View and revoke active sessions
+- **Login Activity Tracking** - Complete history of authentication attempts
+
+### Admin Dashboard
+- **User Management** - View and manage platform users
+- **Content Moderation** - Review and moderate user-generated content
+- **Analytics Dashboard** - Platform usage statistics and performance metrics
+- **System Health** - Edge function status, database stats, and error monitoring
+- **Security Monitoring** - Audit logs and security event tracking
+
+## 📚 Documentation
+
+- [Architecture Overview](docs/ARCHITECTURE.md)
+- [Security Hardening](docs/SECURITY-HARDENING.md)
+- [Login Security](docs/LOGIN-SECURITY.md)
+- [Security Alerts](docs/SECURITY-ALERTS.md)
+- [Video Generation](docs/VIDEO-GENERATION.md)
+- [Branch Management](docs/BRANCH-MANAGEMENT.md)
+- [Deployment Guide](docs/DEPLOYMENT.md)
+
+## Project Info
 
 **URL**: https://lovable.dev/projects/7c12eb32-fc5e-4440-a320-aee6de7cd535
 
