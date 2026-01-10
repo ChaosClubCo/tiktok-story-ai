@@ -37,6 +37,8 @@ const AdminLayout = lazy(() => import("./pages/admin/AdminLayout").then(m => ({ 
 const AdminUsersPage = lazy(() => import("./pages/admin/UsersPage").then(m => ({ default: m.AdminUsersPage })));
 const AdminContentPage = lazy(() => import("./pages/admin/ContentPage").then(m => ({ default: m.AdminContentPage })));
 const SecurityPage = lazy(() => import("./pages/admin/SecurityPage").then(m => ({ default: m.SecurityPage })));
+const AdminSystemPage = lazy(() => import("./pages/admin/SystemPage").then(m => ({ default: m.AdminSystemPage })));
+const AdminAnalyticsPage = lazy(() => import("./pages/admin/AnalyticsPage").then(m => ({ default: m.AdminAnalyticsPage })));
 
 const queryClient = new QueryClient();
 
@@ -88,8 +90,8 @@ const AppContent = () => {
                       <Route path="users" element={<AdminUsersPage />} />
                       <Route path="content" element={<AdminContentPage />} />
                       <Route path="security" element={<SecurityPage />} />
-                      <Route path="analytics" element={<div className="p-8 text-center">Analytics Coming Soon</div>} />
-                      <Route path="system" element={<div className="p-8 text-center">System Health Coming Soon</div>} />
+                      <Route path="analytics" element={<AdminAnalyticsPage />} />
+                      <Route path="system" element={<AdminSystemPage />} />
                     </Route>
                     
                     {/* Catch-all - eagerly loaded */}
