@@ -30,6 +30,8 @@ A powerful AI-powered script generation platform for creating viral short-form v
 
 - [Architecture Overview](docs/ARCHITECTURE.md)
 - [Security Hardening](docs/SECURITY-HARDENING.md)
+- [Audit Report (Jan 2026)](docs/AUDIT-REPORT-2026-01.md) ✨ NEW
+- [Product Roadmap 2026](docs/ROADMAP-2026.md) ✨ NEW
 - [Login Security](docs/LOGIN-SECURITY.md)
 - [Security Alerts](docs/SECURITY-ALERTS.md)
 - [Video Generation](docs/VIDEO-GENERATION.md)
