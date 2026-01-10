@@ -7,6 +7,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import { AdminProvider } from "@/hooks/useAdmin";
 import { GuestModeProvider } from "@/hooks/useGuestMode";
+import { AccountRecoveryProvider } from "@/hooks/useAccountRecovery";
 import { useSecurityHeaders } from "@/hooks/useSecurityHeaders";
 import { LoadingSpinner, SkipLinks, ErrorBoundary } from "@/components/shared";
 import { RouteErrorBoundary } from "@/components/shared/RouteErrorBoundary";
@@ -58,7 +59,8 @@ const AppContent = () => {
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <GuestModeProvider>
-          <AdminProvider>
+          <AccountRecoveryProvider>
+            <AdminProvider>
           <TooltipProvider>
             <Toaster />
             <Sonner />
@@ -105,7 +107,8 @@ const AppContent = () => {
               </RouteErrorBoundary>
             </BrowserRouter>
           </TooltipProvider>
-        </AdminProvider>
+            </AdminProvider>
+          </AccountRecoveryProvider>
         </GuestModeProvider>
       </AuthProvider>
     </QueryClientProvider>
