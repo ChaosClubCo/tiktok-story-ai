@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, HelpCircle, Mail, Phone, MapPin, RefreshCw, ShieldAlert, Clock, Check, Wand2, Fingerprint, UserCircle } from "lucide-react";
+import { Loader2, HelpCircle, Mail, Phone, MapPin, RefreshCw, ShieldAlert, Clock, Check, Wand2, Fingerprint, UserCircle, KeyRound } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { PasswordStrengthIndicator } from "@/components/auth/PasswordStrengthIndicator";
 import { PasswordInput } from "@/components/auth/PasswordInput";
@@ -23,6 +23,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { SocialLoginButtons } from "@/components/auth/SocialLoginButtons";
 import { useBiometricAuth } from "@/hooks/useBiometricAuth";
 import { useGuestMode } from "@/hooks/useGuestMode";
+import { AccountRecoveryFlow } from "@/components/auth/AccountRecoveryFlow";
 
 // Social provider icons
 const GoogleIcon = () => (
@@ -73,6 +74,7 @@ const Auth = () => {
   const biometric = useBiometricAuth();
   const { enterGuestMode } = useGuestMode();
   const [isBiometricLoading, setIsBiometricLoading] = useState(false);
+  const [showAccountRecovery, setShowAccountRecovery] = useState(false);
 
   // Check server-side rate limit on mount
   useEffect(() => {
@@ -811,14 +813,23 @@ const Auth = () => {
                   >
                     Forgot your password?
                   </Button>
-                  <div>
+                  <div className="flex justify-center gap-2">
                     <Button
                       type="button"
                       variant="link"
                       onClick={() => setShowResendVerification(true)}
                       className="text-sm text-muted-foreground"
                     >
-                      Didn't receive verification email?
+                      Resend verification
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="link"
+                      onClick={() => setShowAccountRecovery(true)}
+                      className="text-sm text-muted-foreground"
+                    >
+                      <KeyRound className="h-3 w-3 mr-1" />
+                      Account Recovery
                     </Button>
                   </div>
                 </div>
@@ -1198,6 +1209,13 @@ const Auth = () => {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Account Recovery Flow */}
+      <AccountRecoveryFlow
+        open={showAccountRecovery}
+        onOpenChange={setShowAccountRecovery}
+        onRecoverySuccess={() => setShowAccountRecovery(false)}
+      />
     </div>
   );
 };

@@ -7,6 +7,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
+import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp';
 import { 
   ShieldCheck, 
   Mail, 
@@ -16,7 +17,9 @@ import {
   Loader2, 
   Trash2,
   Plus,
-  KeyRound
+  KeyRound,
+  Send,
+  Clock
 } from 'lucide-react';
 import { useAccountRecovery, SECURITY_QUESTIONS } from '@/hooks/useAccountRecovery';
 import { useToast } from '@/hooks/use-toast';
@@ -28,6 +31,8 @@ export function AccountRecovery() {
     recoveryOptions,
     error,
     saveBackupEmail,
+    sendBackupEmailVerification,
+    verifyBackupEmailCode,
     removeBackupEmail,
     saveSecurityQuestions,
     removeSecurityQuestions,
@@ -36,33 +41,77 @@ export function AccountRecovery() {
   } = useAccountRecovery();
 
   const [showEmailDialog, setShowEmailDialog] = useState(false);
+  const [showVerifyDialog, setShowVerifyDialog] = useState(false);
   const [showQuestionsDialog, setShowQuestionsDialog] = useState(false);
   const [showRemoveEmailDialog, setShowRemoveEmailDialog] = useState(false);
   const [showRemoveQuestionsDialog, setShowRemoveQuestionsDialog] = useState(false);
   
   const [backupEmail, setBackupEmail] = useState('');
+  const [verificationCode, setVerificationCode] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [verificationSent, setVerificationSent] = useState(false);
   
   const [selectedQuestions, setSelectedQuestions] = useState<{ questionId: string; answer: string }[]>([
     { questionId: '', answer: '' },
     { questionId: '', answer: '' },
   ]);
 
-  const { hasBackupEmail, hasSecurityQuestions, isComplete } = getRecoveryStatus();
+  const { hasBackupEmail, hasSecurityQuestions, isComplete, isEmailVerified } = getRecoveryStatus();
 
-  const handleSaveBackupEmail = async () => {
+  const handleSendVerification = async () => {
     setIsSubmitting(true);
     clearError();
     
-    const success = await saveBackupEmail(backupEmail);
+    const result = await sendBackupEmailVerification(backupEmail);
+    
+    if (result.success) {
+      setVerificationSent(true);
+      toast({
+        title: 'Verification Code Sent',
+        description: `Please check ${backupEmail} for your 6-digit code.`,
+      });
+    } else {
+      toast({
+        variant: 'destructive',
+        title: 'Failed to Send',
+        description: error || 'Could not send verification email.',
+      });
+    }
+    
+    setIsSubmitting(false);
+  };
+
+  const handleVerifyCode = async () => {
+    if (verificationCode.length !== 6) {
+      toast({
+        variant: 'destructive',
+        title: 'Invalid Code',
+        description: 'Please enter the 6-digit verification code.',
+      });
+      return;
+    }
+
+    setIsSubmitting(true);
+    clearError();
+    
+    const success = await verifyBackupEmailCode(verificationCode);
     
     if (success) {
       toast({
-        title: 'Backup Email Saved',
-        description: 'Your backup email has been saved for account recovery.',
+        title: 'Email Verified!',
+        description: 'Your backup email has been verified and saved.',
       });
       setShowEmailDialog(false);
+      setShowVerifyDialog(false);
       setBackupEmail('');
+      setVerificationCode('');
+      setVerificationSent(false);
+    } else {
+      toast({
+        variant: 'destructive',
+        title: 'Verification Failed',
+        description: error || 'Invalid or expired code. Please try again.',
+      });
     }
     
     setIsSubmitting(false);
@@ -151,6 +200,13 @@ export function AccountRecovery() {
     return selectedQuestions.map(q => q.questionId).filter(Boolean);
   };
 
+  const handleOpenEmailDialog = () => {
+    setBackupEmail(recoveryOptions.backupEmail || '');
+    setVerificationSent(false);
+    setVerificationCode('');
+    setShowEmailDialog(true);
+  };
+
   if (isLoading) {
     return (
       <Card>
@@ -202,7 +258,7 @@ export function AccountRecovery() {
                 <p className="text-sm text-muted-foreground">
                   {isComplete 
                     ? 'You can recover your account using your backup email or security questions.'
-                    : 'Add a backup email or security questions to recover your account if needed.'}
+                    : 'Add a verified backup email or security questions to recover your account if needed.'}
                 </p>
               </div>
             </div>
@@ -214,10 +270,16 @@ export function AccountRecovery() {
               <div className="flex items-center gap-2">
                 <Mail className="h-4 w-4 text-muted-foreground" />
                 <span className="font-medium">Backup Email</span>
-                {hasBackupEmail && (
+                {hasBackupEmail && isEmailVerified && (
                   <Badge variant="secondary" className="text-xs">
                     <CheckCircle2 className="h-3 w-3 mr-1" />
-                    Configured
+                    Verified
+                  </Badge>
+                )}
+                {hasBackupEmail && !isEmailVerified && (
+                  <Badge variant="outline" className="text-xs text-amber-600 border-amber-500/50">
+                    <Clock className="h-3 w-3 mr-1" />
+                    Pending Verification
                   </Badge>
                 )}
               </div>
@@ -230,13 +292,23 @@ export function AccountRecovery() {
                     <span className="text-sm">{recoveryOptions.backupEmail}</span>
                   </div>
                   <div className="flex gap-2">
+                    {!isEmailVerified && recoveryOptions.pendingBackupEmail && (
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => {
+                          setBackupEmail(recoveryOptions.pendingBackupEmail || '');
+                          setVerificationSent(true);
+                          setShowEmailDialog(true);
+                        }}
+                      >
+                        Enter Code
+                      </Button>
+                    )}
                     <Button 
                       variant="outline" 
                       size="sm"
-                      onClick={() => {
-                        setBackupEmail(recoveryOptions.backupEmail || '');
-                        setShowEmailDialog(true);
-                      }}
+                      onClick={handleOpenEmailDialog}
                     >
                       Change
                     </Button>
@@ -252,7 +324,7 @@ export function AccountRecovery() {
                 </div>
               </div>
             ) : (
-              <Button variant="outline" size="sm" onClick={() => setShowEmailDialog(true)}>
+              <Button variant="outline" size="sm" onClick={handleOpenEmailDialog}>
                 <Plus className="h-4 w-4 mr-2" />
                 Add Backup Email
               </Button>
@@ -314,53 +386,131 @@ export function AccountRecovery() {
         </CardContent>
       </Card>
 
-      {/* Backup Email Dialog */}
+      {/* Backup Email Dialog with Verification */}
       <Dialog open={showEmailDialog} onOpenChange={setShowEmailDialog}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Mail className="h-5 w-5" />
-              {hasBackupEmail ? 'Update Backup Email' : 'Add Backup Email'}
+              {verificationSent ? 'Verify Your Email' : (hasBackupEmail ? 'Update Backup Email' : 'Add Backup Email')}
             </DialogTitle>
             <DialogDescription>
-              Enter an alternative email address that can be used to recover your account.
+              {verificationSent 
+                ? `Enter the 6-digit code sent to ${backupEmail}`
+                : 'Enter an alternative email address. We\'ll send a verification code to confirm it.'}
             </DialogDescription>
           </DialogHeader>
           
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="backup-email">Backup Email Address</Label>
-              <Input
-                id="backup-email"
-                type="email"
-                placeholder="backup@example.com"
-                value={backupEmail}
-                onChange={(e) => setBackupEmail(e.target.value)}
-              />
-              <p className="text-xs text-muted-foreground">
-                Use a different email than your primary account email
-              </p>
-            </div>
-          </div>
+          {!verificationSent ? (
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="backup-email">Backup Email Address</Label>
+                <Input
+                  id="backup-email"
+                  type="email"
+                  placeholder="backup@example.com"
+                  value={backupEmail}
+                  onChange={(e) => setBackupEmail(e.target.value)}
+                  disabled={isSubmitting}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Use a different email than your primary account email
+                </p>
+              </div>
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowEmailDialog(false)}>
-              Cancel
-            </Button>
-            <Button 
-              onClick={handleSaveBackupEmail}
-              disabled={!backupEmail || isSubmitting}
-            >
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Saving...
-                </>
-              ) : (
-                'Save Email'
-              )}
-            </Button>
-          </DialogFooter>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setShowEmailDialog(false)}>
+                  Cancel
+                </Button>
+                <Button 
+                  onClick={handleSendVerification}
+                  disabled={!backupEmail || isSubmitting}
+                >
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Sending...
+                    </>
+                  ) : (
+                    <>
+                      <Send className="h-4 w-4 mr-2" />
+                      Send Verification Code
+                    </>
+                  )}
+                </Button>
+              </DialogFooter>
+            </div>
+          ) : (
+            <div className="space-y-4 py-4">
+              <div className="space-y-4">
+                <Label>Verification Code</Label>
+                <div className="flex justify-center">
+                  <InputOTP
+                    maxLength={6}
+                    value={verificationCode}
+                    onChange={(value) => setVerificationCode(value)}
+                    disabled={isSubmitting}
+                  >
+                    <InputOTPGroup>
+                      <InputOTPSlot index={0} />
+                      <InputOTPSlot index={1} />
+                      <InputOTPSlot index={2} />
+                      <InputOTPSlot index={3} />
+                      <InputOTPSlot index={4} />
+                      <InputOTPSlot index={5} />
+                    </InputOTPGroup>
+                  </InputOTP>
+                </div>
+                <p className="text-xs text-muted-foreground text-center">
+                  Code expires in 15 minutes
+                </p>
+              </div>
+
+              <div className="flex justify-between items-center pt-2">
+                <Button 
+                  variant="link" 
+                  size="sm"
+                  onClick={() => {
+                    setVerificationSent(false);
+                    setVerificationCode('');
+                  }}
+                  disabled={isSubmitting}
+                >
+                  Change email
+                </Button>
+                <Button 
+                  variant="link" 
+                  size="sm"
+                  onClick={handleSendVerification}
+                  disabled={isSubmitting}
+                >
+                  Resend code
+                </Button>
+              </div>
+
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setShowEmailDialog(false)}>
+                  Cancel
+                </Button>
+                <Button 
+                  onClick={handleVerifyCode}
+                  disabled={verificationCode.length !== 6 || isSubmitting}
+                >
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Verifying...
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 className="h-4 w-4 mr-2" />
+                      Verify & Save
+                    </>
+                  )}
+                </Button>
+              </DialogFooter>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
 
