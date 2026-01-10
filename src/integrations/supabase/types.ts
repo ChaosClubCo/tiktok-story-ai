@@ -186,6 +186,36 @@ export type Database = {
           },
         ]
       }
+      account_recovery_options: {
+        Row: {
+          backup_email: string | null
+          backup_email_verified: boolean | null
+          created_at: string
+          id: string
+          security_questions: Json | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          backup_email?: string | null
+          backup_email_verified?: boolean | null
+          created_at?: string
+          id?: string
+          security_questions?: Json | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          backup_email?: string | null
+          backup_email_verified?: boolean | null
+          created_at?: string
+          id?: string
+          security_questions?: Json | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       admin_2fa_attempts: {
         Row: {
           attempt_type: string
@@ -533,6 +563,36 @@ export type Database = {
           preferred_niche?: string | null
           updated_at?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      recovery_rate_limits: {
+        Row: {
+          attempt_count: number | null
+          attempt_type: string
+          blocked_until: string | null
+          created_at: string
+          first_attempt_at: string | null
+          id: string
+          identifier: string
+        }
+        Insert: {
+          attempt_count?: number | null
+          attempt_type: string
+          blocked_until?: string | null
+          created_at?: string
+          first_attempt_at?: string | null
+          id?: string
+          identifier: string
+        }
+        Update: {
+          attempt_count?: number | null
+          attempt_type?: string
+          blocked_until?: string | null
+          created_at?: string
+          first_attempt_at?: string | null
+          id?: string
+          identifier?: string
         }
         Relationships: []
       }

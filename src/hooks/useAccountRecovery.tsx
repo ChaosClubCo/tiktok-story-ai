@@ -26,8 +26,6 @@ interface AccountRecoveryState {
   error: string | null;
 }
 
-const STORAGE_KEY = 'minidrama_recovery_options';
-
 export const SECURITY_QUESTIONS: SecurityQuestion[] = [
   { id: 'pet', question: "What was the name of your first pet?" },
   { id: 'school', question: "What elementary school did you attend?" },
@@ -39,7 +37,7 @@ export const SECURITY_QUESTIONS: SecurityQuestion[] = [
   { id: 'book', question: "What is your favorite book?" },
 ];
 
-// Simple hash function for storing answers (in production, use proper hashing on server)
+// Simple hash function for storing answers
 const hashAnswer = (answer: string): string => {
   const normalized = answer.toLowerCase().trim();
   let hash = 0;
@@ -51,21 +49,18 @@ const hashAnswer = (answer: string): string => {
   return hash.toString(36);
 };
 
-const verifyAnswer = (answer: string, storedHash: string): boolean => {
-  return hashAnswer(answer) === storedHash;
-};
-
 interface AccountRecoveryContextType extends AccountRecoveryState {
   saveBackupEmail: (email: string) => Promise<boolean>;
   sendBackupEmailVerification: (email: string) => Promise<{ success: boolean; token?: string }>;
   verifyBackupEmailCode: (code: string) => Promise<boolean>;
-  removeBackupEmail: () => void;
+  removeBackupEmail: () => Promise<void>;
   saveSecurityQuestions: (questions: { questionId: string; answer: string }[]) => Promise<boolean>;
-  removeSecurityQuestions: () => void;
-  verifySecurityAnswers: (answers: { questionId: string; answer: string }[]) => boolean;
+  removeSecurityQuestions: () => Promise<void>;
+  verifySecurityAnswers: (answers: { questionId: string; answer: string }[]) => Promise<boolean>;
   verifyBackupEmail: (email: string) => boolean;
   clearError: () => void;
   getRecoveryStatus: () => { hasBackupEmail: boolean; hasSecurityQuestions: boolean; isComplete: boolean; isEmailVerified: boolean };
+  refreshRecoveryOptions: () => Promise<void>;
 }
 
 const AccountRecoveryContext = createContext<AccountRecoveryContextType | undefined>(undefined);
@@ -86,73 +81,58 @@ export function AccountRecoveryProvider({ children }: { children: React.ReactNod
     error: null,
   });
 
-  // Load recovery options from storage
-  useEffect(() => {
-    const loadRecoveryOptions = () => {
-      try {
-        const stored = localStorage.getItem(STORAGE_KEY);
-        if (stored) {
-          const parsed = JSON.parse(stored);
-          if (user?.id && parsed.userId === user.id) {
-            setState({
-              isLoading: false,
-              recoveryOptions: {
-                backupEmail: parsed.options.backupEmail || null,
-                backupEmailVerified: parsed.options.backupEmailVerified || false,
-                pendingBackupEmail: parsed.options.pendingBackupEmail || null,
-                verificationToken: parsed.options.verificationToken || null,
-                verificationExpiry: parsed.options.verificationExpiry || null,
-                securityQuestions: parsed.options.securityQuestions || [],
-                recoverySetupComplete: parsed.options.recoverySetupComplete || false,
-              },
-              error: null,
-            });
-            return;
-          }
-        }
-        
-        setState({
-          isLoading: false,
-          recoveryOptions: {
-            backupEmail: null,
-            backupEmailVerified: false,
-            pendingBackupEmail: null,
-            verificationToken: null,
-            verificationExpiry: null,
-            securityQuestions: [],
-            recoverySetupComplete: false,
-          },
-          error: null,
-        });
-      } catch {
-        setState(prev => ({
-          ...prev,
-          isLoading: false,
-          error: 'Failed to load recovery options',
-        }));
+  // Load recovery options from database
+  const loadRecoveryOptions = useCallback(async () => {
+    if (!user?.id) {
+      setState(prev => ({ ...prev, isLoading: false }));
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('account_recovery_options')
+        .select('*')
+        .eq('user_id', user.id)
+        .single();
+
+      if (error && error.code !== 'PGRST116') {
+        console.error('Failed to load recovery options:', error);
       }
-    };
 
+      // Also check localStorage for pending verification
+      const pendingData = localStorage.getItem('minidrama_pending_verification');
+      const pending = pendingData ? JSON.parse(pendingData) : null;
+
+      const securityQuestions = (data?.security_questions as { questionId: string; answerHash: string }[]) || [];
+      const hasBackupEmail = !!data?.backup_email && data?.backup_email_verified;
+      const hasSecurityQuestions = securityQuestions.length >= 2;
+
+      setState({
+        isLoading: false,
+        recoveryOptions: {
+          backupEmail: data?.backup_email || null,
+          backupEmailVerified: data?.backup_email_verified || false,
+          pendingBackupEmail: pending?.email || null,
+          verificationToken: pending?.token || null,
+          verificationExpiry: pending?.expiry || null,
+          securityQuestions,
+          recoverySetupComplete: hasBackupEmail || hasSecurityQuestions,
+        },
+        error: null,
+      });
+    } catch (error) {
+      console.error('Error loading recovery options:', error);
+      setState(prev => ({
+        ...prev,
+        isLoading: false,
+        error: 'Failed to load recovery options',
+      }));
+    }
+  }, [user?.id]);
+
+  useEffect(() => {
     loadRecoveryOptions();
-  }, [user?.id]);
-
-  // Save to storage
-  const saveToStorage = useCallback((options: RecoveryOptions) => {
-    if (!user?.id) return;
-    
-    const isComplete = !!((options.backupEmail && options.backupEmailVerified) || options.securityQuestions.length >= 2);
-    const updatedOptions = { ...options, recoverySetupComplete: isComplete };
-    
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({
-      userId: user.id,
-      options: updatedOptions,
-    }));
-    
-    setState(prev => ({
-      ...prev,
-      recoveryOptions: updatedOptions,
-    }));
-  }, [user?.id]);
+  }, [loadRecoveryOptions]);
 
   // Send backup email verification code
   const sendBackupEmailVerification = useCallback(async (email: string): Promise<{ success: boolean; token?: string }> => {
@@ -175,16 +155,23 @@ export function AccountRecoveryProvider({ children }: { children: React.ReactNod
 
       if (error) throw error;
 
-      // Store pending verification
-      const updatedOptions = {
-        ...state.recoveryOptions,
-        pendingBackupEmail: email,
-        verificationToken: data.token,
-        verificationExpiry: data.expiresAt,
-      };
-      
-      saveToStorage(updatedOptions);
-      setState(prev => ({ ...prev, isLoading: false }));
+      // Store pending verification in localStorage (temporary)
+      localStorage.setItem('minidrama_pending_verification', JSON.stringify({
+        email,
+        token: data.token,
+        expiry: data.expiresAt,
+      }));
+
+      setState(prev => ({
+        ...prev,
+        isLoading: false,
+        recoveryOptions: {
+          ...prev.recoveryOptions,
+          pendingBackupEmail: email,
+          verificationToken: data.token,
+          verificationExpiry: data.expiresAt,
+        },
+      }));
       
       return { success: true, token: data.token };
     } catch (error: any) {
@@ -195,7 +182,7 @@ export function AccountRecoveryProvider({ children }: { children: React.ReactNod
       }));
       return { success: false };
     }
-  }, [state.recoveryOptions, saveToStorage]);
+  }, []);
 
   // Verify backup email code
   const verifyBackupEmailCode = useCallback(async (code: string): Promise<boolean> => {
@@ -224,18 +211,33 @@ export function AccountRecoveryProvider({ children }: { children: React.ReactNod
         throw new Error('Email mismatch');
       }
 
-      // Verification successful - save the email
-      const updatedOptions = {
-        ...state.recoveryOptions,
-        backupEmail: pendingBackupEmail,
-        backupEmailVerified: true,
-        pendingBackupEmail: null,
-        verificationToken: null,
-        verificationExpiry: null,
-      };
-      
-      saveToStorage(updatedOptions);
-      setState(prev => ({ ...prev, isLoading: false }));
+      // Save to database via edge function
+      const { error } = await supabase.functions.invoke('recovery-options', {
+        body: { 
+          action: 'save_backup_email',
+          backupEmail: pendingBackupEmail,
+        },
+      });
+
+      if (error) throw error;
+
+      // Clear pending verification
+      localStorage.removeItem('minidrama_pending_verification');
+
+      setState(prev => ({
+        ...prev,
+        isLoading: false,
+        recoveryOptions: {
+          ...prev.recoveryOptions,
+          backupEmail: pendingBackupEmail,
+          backupEmailVerified: true,
+          pendingBackupEmail: null,
+          verificationToken: null,
+          verificationExpiry: null,
+          recoverySetupComplete: true,
+        },
+      }));
+
       return true;
     } catch (error: any) {
       setState(prev => ({
@@ -245,27 +247,48 @@ export function AccountRecoveryProvider({ children }: { children: React.ReactNod
       }));
       return false;
     }
-  }, [state.recoveryOptions, saveToStorage]);
+  }, [state.recoveryOptions]);
 
   // Save backup email (legacy - now requires verification)
   const saveBackupEmail = useCallback(async (email: string): Promise<boolean> => {
-    // This now just initiates verification
     const result = await sendBackupEmailVerification(email);
     return result.success;
   }, [sendBackupEmailVerification]);
 
   // Remove backup email
-  const removeBackupEmail = useCallback(() => {
-    const updatedOptions = {
-      ...state.recoveryOptions,
-      backupEmail: null,
-      backupEmailVerified: false,
-      pendingBackupEmail: null,
-      verificationToken: null,
-      verificationExpiry: null,
-    };
-    saveToStorage(updatedOptions);
-  }, [state.recoveryOptions, saveToStorage]);
+  const removeBackupEmail = useCallback(async () => {
+    setState(prev => ({ ...prev, isLoading: true, error: null }));
+
+    try {
+      const { error } = await supabase.functions.invoke('recovery-options', {
+        body: { action: 'remove_backup_email' },
+      });
+
+      if (error) throw error;
+
+      localStorage.removeItem('minidrama_pending_verification');
+
+      setState(prev => ({
+        ...prev,
+        isLoading: false,
+        recoveryOptions: {
+          ...prev.recoveryOptions,
+          backupEmail: null,
+          backupEmailVerified: false,
+          pendingBackupEmail: null,
+          verificationToken: null,
+          verificationExpiry: null,
+          recoverySetupComplete: prev.recoveryOptions.securityQuestions.length >= 2,
+        },
+      }));
+    } catch (error: any) {
+      setState(prev => ({
+        ...prev,
+        isLoading: false,
+        error: error.message || 'Failed to remove backup email',
+      }));
+    }
+  }, []);
 
   // Save security questions
   const saveSecurityQuestions = useCallback(async (
@@ -283,13 +306,25 @@ export function AccountRecoveryProvider({ children }: { children: React.ReactNod
         answerHash: hashAnswer(q.answer),
       }));
 
-      const updatedOptions = {
-        ...state.recoveryOptions,
-        securityQuestions: hashedQuestions,
-      };
-      
-      saveToStorage(updatedOptions);
-      setState(prev => ({ ...prev, isLoading: false }));
+      const { error } = await supabase.functions.invoke('recovery-options', {
+        body: { 
+          action: 'save_security_questions',
+          securityQuestions: hashedQuestions,
+        },
+      });
+
+      if (error) throw error;
+
+      setState(prev => ({
+        ...prev,
+        isLoading: false,
+        recoveryOptions: {
+          ...prev.recoveryOptions,
+          securityQuestions: hashedQuestions,
+          recoverySetupComplete: true,
+        },
+      }));
+
       return true;
     } catch (error: any) {
       setState(prev => ({
@@ -299,21 +334,41 @@ export function AccountRecoveryProvider({ children }: { children: React.ReactNod
       }));
       return false;
     }
-  }, [state.recoveryOptions, saveToStorage]);
+  }, []);
 
   // Remove security questions
-  const removeSecurityQuestions = useCallback(() => {
-    const updatedOptions = {
-      ...state.recoveryOptions,
-      securityQuestions: [],
-    };
-    saveToStorage(updatedOptions);
-  }, [state.recoveryOptions, saveToStorage]);
+  const removeSecurityQuestions = useCallback(async () => {
+    setState(prev => ({ ...prev, isLoading: true, error: null }));
 
-  // Verify security answers
-  const verifySecurityAnswers = useCallback((
+    try {
+      const { error } = await supabase.functions.invoke('recovery-options', {
+        body: { action: 'remove_security_questions' },
+      });
+
+      if (error) throw error;
+
+      setState(prev => ({
+        ...prev,
+        isLoading: false,
+        recoveryOptions: {
+          ...prev.recoveryOptions,
+          securityQuestions: [],
+          recoverySetupComplete: !!(prev.recoveryOptions.backupEmail && prev.recoveryOptions.backupEmailVerified),
+        },
+      }));
+    } catch (error: any) {
+      setState(prev => ({
+        ...prev,
+        isLoading: false,
+        error: error.message || 'Failed to remove security questions',
+      }));
+    }
+  }, []);
+
+  // Verify security answers (for recovery flow)
+  const verifySecurityAnswers = useCallback(async (
     answers: { questionId: string; answer: string }[]
-  ): boolean => {
+  ): Promise<boolean> => {
     const storedQuestions = state.recoveryOptions.securityQuestions;
     
     if (storedQuestions.length === 0) return false;
@@ -321,19 +376,19 @@ export function AccountRecoveryProvider({ children }: { children: React.ReactNod
     let correctCount = 0;
     for (const answer of answers) {
       const storedQuestion = storedQuestions.find(q => q.questionId === answer.questionId);
-      if (storedQuestion && verifyAnswer(answer.answer, storedQuestion.answerHash)) {
+      if (storedQuestion && hashAnswer(answer.answer) === storedQuestion.answerHash) {
         correctCount++;
       }
     }
     
-    // Require at least 2 correct answers
     return correctCount >= 2;
   }, [state.recoveryOptions.securityQuestions]);
 
   // Verify backup email
   const verifyBackupEmail = useCallback((email: string): boolean => {
-    return state.recoveryOptions.backupEmail?.toLowerCase() === email.toLowerCase();
-  }, [state.recoveryOptions.backupEmail]);
+    return state.recoveryOptions.backupEmail?.toLowerCase() === email.toLowerCase() && 
+           state.recoveryOptions.backupEmailVerified;
+  }, [state.recoveryOptions.backupEmail, state.recoveryOptions.backupEmailVerified]);
 
   // Clear error
   const clearError = useCallback(() => {
@@ -350,6 +405,11 @@ export function AccountRecoveryProvider({ children }: { children: React.ReactNod
     return { hasBackupEmail, hasSecurityQuestions, isComplete, isEmailVerified };
   }, [state.recoveryOptions]);
 
+  // Refresh recovery options from database
+  const refreshRecoveryOptions = useCallback(async () => {
+    await loadRecoveryOptions();
+  }, [loadRecoveryOptions]);
+
   return (
     <AccountRecoveryContext.Provider
       value={{
@@ -364,6 +424,7 @@ export function AccountRecoveryProvider({ children }: { children: React.ReactNod
         verifyBackupEmail,
         clearError,
         getRecoveryStatus,
+        refreshRecoveryOptions,
       }}
     >
       {children}
