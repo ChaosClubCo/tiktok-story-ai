@@ -22,10 +22,12 @@ import {
   Users,
   Bell,
   Key,
-  Activity
+  Activity,
+  FlaskConical
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { ApiTestingSandbox } from '@/components/admin/ApiTestingSandbox';
 
 interface EndpointParam {
   name: string;
@@ -690,6 +692,7 @@ export const ApiDocsPage = () => {
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('all');
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState('docs');
 
   const filteredEndpoints = API_ENDPOINTS.filter(ep => {
     const matchesSearch = search === '' || 
@@ -730,26 +733,44 @@ export const ApiDocsPage = () => {
 
   return (
     <div className="space-y-6 p-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">API Documentation</h1>
-        <p className="text-muted-foreground">Complete reference for all Edge Functions</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">API Documentation</h1>
+          <p className="text-muted-foreground">Complete reference for all Edge Functions</p>
+        </div>
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <TabsList>
+            <TabsTrigger value="docs">
+              <FileCode className="h-4 w-4 mr-2" />
+              Documentation
+            </TabsTrigger>
+            <TabsTrigger value="sandbox">
+              <FlaskConical className="h-4 w-4 mr-2" />
+              Testing Sandbox
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
       </div>
 
-      {/* Search and Filters */}
-      <div className="flex flex-col sm:flex-row gap-4">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search endpoints..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-9"
-          />
-        </div>
-        <div className="text-sm text-muted-foreground self-center">
-          {filteredEndpoints.length} endpoints
-        </div>
-      </div>
+      {activeTab === 'sandbox' ? (
+        <ApiTestingSandbox />
+      ) : (
+        <>
+          {/* Search and Filters */}
+          <div className="flex flex-col sm:flex-row gap-4">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search endpoints..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+            <div className="text-sm text-muted-foreground self-center">
+              {filteredEndpoints.length} endpoints
+            </div>
+          </div>
 
       {/* Category Tabs */}
       <Tabs value={category} onValueChange={setCategory}>
@@ -888,6 +909,8 @@ export const ApiDocsPage = () => {
           ))}
         </div>
       </ScrollArea>
+        </>
+      )}
     </div>
   );
 };
