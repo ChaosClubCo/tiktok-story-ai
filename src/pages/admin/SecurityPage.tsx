@@ -5,13 +5,16 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { Shield, AlertTriangle, Activity, Key, RefreshCw, Clock, TrendingUp, Lock, Mail, Download } from 'lucide-react';
+import { Shield, AlertTriangle, Activity, Key, RefreshCw, Clock, TrendingUp, Lock, Mail, Download, Globe, CheckCircle, Palette } from 'lucide-react';
 import { SecurityIndicator } from '@/components/SecurityIndicator';
 import { ApiKeyRotation } from '@/components/admin/ApiKeyRotation';
 import { Admin2FASettings } from '@/components/admin/Admin2FASettings';
 import { LiveSecurityFeed } from '@/components/admin/LiveSecurityFeed';
 import { SecurityDigestSettings } from '@/components/admin/SecurityDigestSettings';
 import { SecurityAuditExport } from '@/components/admin/SecurityAuditExport';
+import { ThreatGeolocationMap } from '@/components/admin/ThreatGeolocationMap';
+import { ComplianceDashboard } from '@/components/admin/ComplianceDashboard';
+import { EmailBrandingSettings } from '@/components/admin/EmailBrandingSettings';
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner';
 interface SecurityEvent {
   id: string;
@@ -189,8 +192,11 @@ export const SecurityPage = () => {
       <Tabs defaultValue="live" className="space-y-4">
         <TabsList className="flex-wrap h-auto gap-1">
           <TabsTrigger value="live">Live Monitoring</TabsTrigger>
+          <TabsTrigger value="threatmap">Threat Map</TabsTrigger>
           <TabsTrigger value="events">Security Events</TabsTrigger>
+          <TabsTrigger value="compliance">Compliance</TabsTrigger>
           <TabsTrigger value="digest">Email Digests</TabsTrigger>
+          <TabsTrigger value="branding">Email Branding</TabsTrigger>
           <TabsTrigger value="export">Export Reports</TabsTrigger>
           <TabsTrigger value="2fa">Two-Factor Auth</TabsTrigger>
           <TabsTrigger value="keys">API Key Rotation</TabsTrigger>
@@ -199,6 +205,10 @@ export const SecurityPage = () => {
 
         <TabsContent value="live" className="space-y-4">
           <LiveSecurityFeed />
+        </TabsContent>
+
+        <TabsContent value="threatmap" className="space-y-4">
+          <ThreatGeolocationMap />
         </TabsContent>
 
         <TabsContent value="events" className="space-y-4">
@@ -243,8 +253,16 @@ export const SecurityPage = () => {
           </Card>
         </TabsContent>
 
+        <TabsContent value="compliance">
+          <ComplianceDashboard />
+        </TabsContent>
+
         <TabsContent value="digest">
           <SecurityDigestSettings />
+        </TabsContent>
+
+        <TabsContent value="branding">
+          <EmailBrandingSettings />
         </TabsContent>
 
         <TabsContent value="export">
