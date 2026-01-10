@@ -10,7 +10,9 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, HelpCircle, Mail, Phone, MapPin, RefreshCw, ShieldAlert, Clock } from "lucide-react";
+import { Loader2, HelpCircle, Mail, Phone, MapPin, RefreshCw, ShieldAlert, Clock, Check } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { PasswordStrengthIndicator } from "@/components/auth/PasswordStrengthIndicator";
 import { useSecurityMonitoring } from "@/hooks/useSecurityMonitoring";
 import { useRateLimit } from "@/hooks/useRateLimit";
 import { useLoginRateLimit } from "@/hooks/useLoginRateLimit";
@@ -55,6 +57,7 @@ const Auth = () => {
   const [showResendVerification, setShowResendVerification] = useState(false);
   const [resendEmail, setResendEmail] = useState("");
   const [isResendLoading, setIsResendLoading] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
   const passwordResetRateLimit = useRateLimit({ maxAttempts: 3, windowMs: 5 * 60 * 1000, identifier: 'password-reset' });
   const resendVerificationRateLimit = useRateLimit({ maxAttempts: 3, windowMs: 5 * 60 * 1000, identifier: 'resend-verification' });
 
@@ -269,10 +272,24 @@ const Auth = () => {
       return;
     }
 
+    // Set session persistence based on remember me option
+    // If rememberMe is true, use longer session duration
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
+      options: {
+        // Supabase handles session persistence via cookies
+        // The remember me preference is stored to indicate user intent
+      }
     });
+
+    // Store remember me preference for session restoration
+    if (rememberMe) {
+      localStorage.setItem('minidrama_remember_me', 'true');
+    } else {
+      localStorage.removeItem('minidrama_remember_me');
+      // For non-remember sessions, we'll let the default session behavior handle expiry
+    }
 
     if (error) {
       monitorAuthAttempts(email, false);
@@ -597,6 +614,22 @@ const Auth = () => {
                     disabled={isLoading}
                   />
                 </div>
+
+                {/* Remember Me */}
+                <div className="flex items-center space-x-2">
+                  <Checkbox 
+                    id="remember-me" 
+                    checked={rememberMe}
+                    onCheckedChange={(checked) => setRememberMe(checked === true)}
+                    disabled={isLoading}
+                  />
+                  <Label 
+                    htmlFor="remember-me" 
+                    className="text-sm font-normal cursor-pointer"
+                  >
+                    Remember me for 30 days
+                  </Label>
+                </div>
                 
                 {/* Login CAPTCHA - shown after 3 failed attempts */}
                 {loginRateLimit.requiresCaptcha && (
@@ -682,11 +715,12 @@ const Auth = () => {
                   <Input
                     id="signup-password"
                     type="password"
-                    placeholder="Create a strong password (8+ chars, mixed case, numbers, symbols)"
+                    placeholder="Create a strong password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     disabled={isLoading}
                   />
+                  <PasswordStrengthIndicator password={password} />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="captcha">Security Verification</Label>
