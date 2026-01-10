@@ -38,13 +38,11 @@ The MiniDrama Script Generator has been thoroughly audited across security, perf
 #### Critical (0)
 None identified.
 
-#### Warnings (4)
+#### Warnings (3) - Reduced from 4 ✅
 
-1. **login_rate_limits - Permissive RLS Policy**
-   - **Issue:** Policy `USING (true)` allows public read access
-   - **Risk:** Attackers can see blocked IP addresses and timing
-   - **Recommendation:** Restrict to service role only
-   - **Priority:** Medium
+1. ~~**login_rate_limits - Permissive RLS Policy**~~ ✅ FIXED
+   - Policy now restricted to super_admin and support_admin only
+   - Service role operations continue via RLS bypass
 
 2. **trending_topics - Public Read Access**
    - **Issue:** Policy `auth_read` has `USING (true)` 
