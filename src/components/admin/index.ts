@@ -8,4 +8,7 @@ export { LiveSecurityFeed } from './LiveSecurityFeed';
 export { SecurityDigestSettings } from './SecurityDigestSettings';
 export { SecurityAuditExport } from './SecurityAuditExport';
 export { ApiTestingSandbox } from './ApiTestingSandbox';
+export { ThreatGeolocationMap } from './ThreatGeolocationMap';
+export { ComplianceDashboard } from './ComplianceDashboard';
+export { EmailBrandingSettings } from './EmailBrandingSettings';
 export * from './types';
