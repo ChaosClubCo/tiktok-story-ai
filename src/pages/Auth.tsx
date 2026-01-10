@@ -52,7 +52,11 @@ const Auth = () => {
   const loginRateLimit = useLoginRateLimit();
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [isAppleLoading, setIsAppleLoading] = useState(false);
+  const [showResendVerification, setShowResendVerification] = useState(false);
+  const [resendEmail, setResendEmail] = useState("");
+  const [isResendLoading, setIsResendLoading] = useState(false);
   const passwordResetRateLimit = useRateLimit({ maxAttempts: 3, windowMs: 5 * 60 * 1000, identifier: 'password-reset' });
+  const resendVerificationRateLimit = useRateLimit({ maxAttempts: 3, windowMs: 5 * 60 * 1000, identifier: 'resend-verification' });
 
   // Check server-side rate limit on mount
   useEffect(() => {
@@ -276,13 +280,43 @@ const Auth = () => {
       // Record failed attempt to server for IP-based rate limiting
       const rateLimitResult = await loginRateLimit.recordAttempt(false, captchaSolved);
       
+      // Parse error message for clearer user feedback
+      let errorTitle = "Sign In Failed";
       let errorMessage = error.message;
+      let showResendOption = false;
+      
+      // Distinguish between different error types
+      if (error.message.toLowerCase().includes('invalid login credentials')) {
+        // Check if email exists by attempting to get user (this is a safe check)
+        const { data: signUpData } = await supabase.auth.signUp({
+          email,
+          password: 'temp_check_12345!',
+          options: { data: { check_only: true } }
+        });
+        
+        // If signUp returns a user without session, email exists (wrong password)
+        // If signUp returns with identities array empty, email exists
+        if (signUpData?.user?.identities && signUpData.user.identities.length === 0) {
+          errorTitle = "Incorrect Password";
+          errorMessage = "The password you entered is incorrect. Please try again or reset your password.";
+        } else {
+          errorTitle = "Account Not Found";
+          errorMessage = "No account exists with this email address. Please check your email or create a new account.";
+        }
+      } else if (error.message.toLowerCase().includes('email not confirmed')) {
+        errorTitle = "Email Not Verified";
+        errorMessage = "Please verify your email before signing in. Check your inbox for the verification link.";
+        showResendOption = true;
+        setResendEmail(email);
+      }
+      
+      // Add rate limit context to error message
       if (rateLimitResult?.requiresCaptcha && !captchaSolved) {
-        errorMessage = `${error.message}. Please complete security verification to continue.`;
+        errorMessage = `${errorMessage} Please complete security verification to continue.`;
         generateLoginCaptcha();
       } else if (rateLimitResult?.message && rateLimitResult.captchaAttemptsRemaining !== undefined) {
         if (rateLimitResult.captchaAttemptsRemaining <= 3 && rateLimitResult.captchaAttemptsRemaining > 0) {
-          errorMessage = `${error.message}. ${rateLimitResult.captchaAttemptsRemaining} attempts remaining before lockout.`;
+          errorMessage = `${errorMessage} ${rateLimitResult.captchaAttemptsRemaining} attempts remaining before lockout.`;
         }
         if (rateLimitResult.requiresCaptcha) {
           generateLoginCaptcha();
@@ -290,9 +324,18 @@ const Auth = () => {
       }
       
       toast({
-        title: "Sign In Failed",
+        title: errorTitle,
         description: errorMessage,
         variant: "destructive",
+        action: showResendOption ? (
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={() => setShowResendVerification(true)}
+          >
+            Resend Email
+          </Button>
+        ) : undefined,
       });
       setIsLoading(false);
     } else if (data.session) {
@@ -405,6 +448,66 @@ const Auth = () => {
       });
       setIsAppleLoading(false);
     }
+  };
+
+  const handleResendVerification = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    // Check rate limiting
+    const rateLimitCheck = resendVerificationRateLimit.checkRateLimit();
+    if (!rateLimitCheck.allowed) {
+      toast({
+        variant: "destructive",
+        title: "Too Many Requests",
+        description: `Please wait ${rateLimitCheck.retryAfter} seconds before requesting another verification email.`,
+      });
+      return;
+    }
+    
+    setIsResendLoading(true);
+
+    if (!resendEmail || !resendEmail.includes('@')) {
+      toast({
+        variant: "destructive",
+        title: "Invalid Email",
+        description: "Please enter a valid email address.",
+      });
+      setIsResendLoading(false);
+      return;
+    }
+
+    // Use resend method - this will send a new confirmation email
+    const { error } = await supabase.auth.resend({
+      type: 'signup',
+      email: resendEmail,
+      options: {
+        emailRedirectTo: `${window.location.origin}/`,
+      },
+    });
+
+    if (error) {
+      // Handle specific error cases
+      let errorMessage = error.message;
+      if (error.message.toLowerCase().includes('rate limit')) {
+        errorMessage = "Too many requests. Please wait a few minutes before trying again.";
+      } else if (error.message.toLowerCase().includes('already confirmed')) {
+        errorMessage = "This email is already verified. You can sign in directly.";
+      }
+      
+      toast({
+        title: "Resend Failed",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    } else {
+      toast({
+        title: "Verification Email Sent!",
+        description: "Please check your inbox and click the verification link. Don't forget to check your spam folder.",
+      });
+      setShowResendVerification(false);
+      setResendEmail("");
+    }
+    setIsResendLoading(false);
   };
 
   return (
@@ -536,7 +639,7 @@ const Auth = () => {
                   {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   {loginRateLimit.isBlocked ? `Locked (${loginRateLimit.formatTimeRemaining()})` : 'Sign In'}
                 </Button>
-                <div className="text-center">
+                <div className="text-center space-y-1">
                   <Button
                     type="button"
                     variant="link"
@@ -545,6 +648,16 @@ const Auth = () => {
                   >
                     Forgot your password?
                   </Button>
+                  <div>
+                    <Button
+                      type="button"
+                      variant="link"
+                      onClick={() => setShowResendVerification(true)}
+                      className="text-sm text-muted-foreground"
+                    >
+                      Didn't receive verification email?
+                    </Button>
+                  </div>
                 </div>
                 
                 <SocialLoginButtons disabled={isLoading} />
@@ -696,6 +809,57 @@ const Auth = () => {
               <Button type="submit" className="flex-1" disabled={isResetLoading}>
                 {isResetLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Send Reset Link
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Resend Verification Email Dialog */}
+      <Dialog open={showResendVerification} onOpenChange={setShowResendVerification}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Resend Verification Email</DialogTitle>
+            <DialogDescription>
+              Enter your email address and we'll send you a new verification link. 
+              Check your spam folder if you don't see it in your inbox.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleResendVerification} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="resend-email">Email</Label>
+              <Input
+                id="resend-email"
+                type="email"
+                placeholder="Enter your email"
+                value={resendEmail}
+                onChange={(e) => setResendEmail(e.target.value)}
+                disabled={isResendLoading}
+              />
+            </div>
+            <Alert className="border-muted bg-muted/50">
+              <Mail className="h-4 w-4" />
+              <AlertDescription className="text-sm">
+                Verification emails are valid for 24 hours. If your link expired, 
+                use this form to request a new one.
+              </AlertDescription>
+            </Alert>
+            <div className="flex space-x-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setShowResendVerification(false);
+                  setResendEmail("");
+                }}
+                className="flex-1"
+                disabled={isResendLoading}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" className="flex-1" disabled={isResendLoading}>
+                {isResendLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Resend Verification
               </Button>
             </div>
           </form>
