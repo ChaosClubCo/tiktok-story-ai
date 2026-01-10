@@ -67,6 +67,8 @@ export const PasswordChange = () => {
 
     setLoading(true);
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      
       const { error } = await supabase.auth.updateUser({
         password: newPassword,
       });
@@ -80,6 +82,22 @@ export const PasswordChange = () => {
           throw new Error('Password is too weak. Please choose a stronger password');
         }
         throw error;
+      }
+
+      // Send security alert for password change
+      if (user?.id) {
+        try {
+          await supabase.functions.invoke('send-security-alert', {
+            body: {
+              userId: user.id,
+              alertType: 'password_changed',
+              userAgent: navigator.userAgent,
+            },
+          });
+        } catch (alertError) {
+          // Don't fail the password change if alert fails
+          console.error('Failed to send security alert:', alertError);
+        }
       }
 
       toast.success('Password updated successfully');
