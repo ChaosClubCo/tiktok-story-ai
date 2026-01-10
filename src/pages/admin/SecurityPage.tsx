@@ -9,6 +9,7 @@ import { Shield, AlertTriangle, Activity, Key, RefreshCw, Clock, TrendingUp, Loc
 import { SecurityIndicator } from '@/components/SecurityIndicator';
 import { ApiKeyRotation } from '@/components/admin/ApiKeyRotation';
 import { Admin2FASettings } from '@/components/admin/Admin2FASettings';
+import { LiveSecurityFeed } from '@/components/admin/LiveSecurityFeed';
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner';
 
 interface SecurityEvent {
@@ -184,13 +185,18 @@ export const SecurityPage = () => {
       </div>
 
       {/* Main Content Tabs */}
-      <Tabs defaultValue="events" className="space-y-4">
+      <Tabs defaultValue="live" className="space-y-4">
         <TabsList>
+          <TabsTrigger value="live">Live Monitoring</TabsTrigger>
           <TabsTrigger value="events">Security Events</TabsTrigger>
           <TabsTrigger value="2fa">Two-Factor Auth</TabsTrigger>
           <TabsTrigger value="keys">API Key Rotation</TabsTrigger>
           <TabsTrigger value="headers">Security Headers</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="live" className="space-y-4">
+          <LiveSecurityFeed />
+        </TabsContent>
 
         <TabsContent value="events" className="space-y-4">
           <Card>

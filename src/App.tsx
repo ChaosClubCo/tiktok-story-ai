@@ -39,6 +39,7 @@ const AdminContentPage = lazy(() => import("./pages/admin/ContentPage").then(m =
 const SecurityPage = lazy(() => import("./pages/admin/SecurityPage").then(m => ({ default: m.SecurityPage })));
 const AdminSystemPage = lazy(() => import("./pages/admin/SystemPage").then(m => ({ default: m.AdminSystemPage })));
 const AdminAnalyticsPage = lazy(() => import("./pages/admin/AnalyticsPage").then(m => ({ default: m.AdminAnalyticsPage })));
+const ApiDocsPage = lazy(() => import("./pages/admin/ApiDocsPage").then(m => ({ default: m.ApiDocsPage })));
 
 const queryClient = new QueryClient();
 
@@ -92,6 +93,7 @@ const AppContent = () => {
                       <Route path="security" element={<SecurityPage />} />
                       <Route path="analytics" element={<AdminAnalyticsPage />} />
                       <Route path="system" element={<AdminSystemPage />} />
+                      <Route path="api-docs" element={<ApiDocsPage />} />
                     </Route>
                     
                     {/* Catch-all - eagerly loaded */}

@@ -5,7 +5,7 @@ import { useAdminRouteProtection } from '@/hooks/useAdminRouteProtection';
 import { usePageTitle } from '@/hooks/usePageTitle';
 import { AdminSidebar, SecurityStatusBanner } from '@/components/admin';
 import { LoadingSpinner } from '@/components/shared';
-import { Users, FileText, TrendingUp, Settings, Shield } from 'lucide-react';
+import { Users, FileText, TrendingUp, Settings, Shield, FileCode } from 'lucide-react';
 import type { AdminNavItem } from '@/components/admin/types';
 
 // Admin navigation configuration
@@ -30,7 +30,7 @@ const ADMIN_NAV_ITEMS: AdminNavItem[] = [
     path: '/admin/security',
     icon: Shield,
     description: 'Security dashboard',
-    badge: 'Active',
+    badge: 'Live',
   },
   {
     id: 'analytics',
@@ -46,6 +46,13 @@ const ADMIN_NAV_ITEMS: AdminNavItem[] = [
     icon: Settings,
     description: 'System settings',
     requiresSuperAdmin: true,
+  },
+  {
+    id: 'api-docs',
+    label: 'API Docs',
+    path: '/admin/api-docs',
+    icon: FileCode,
+    description: 'API documentation',
   },
 ];
 
