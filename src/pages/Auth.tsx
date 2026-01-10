@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, HelpCircle, Mail, Phone, MapPin, RefreshCw, ShieldAlert, Clock, Check, Wand2 } from "lucide-react";
+import { Loader2, HelpCircle, Mail, Phone, MapPin, RefreshCw, ShieldAlert, Clock, Check, Wand2, Fingerprint, UserCircle } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { PasswordStrengthIndicator } from "@/components/auth/PasswordStrengthIndicator";
 import { PasswordInput } from "@/components/auth/PasswordInput";
@@ -21,6 +21,8 @@ import { SecurityIndicator } from "@/components/SecurityIndicator";
 import { signUpSchema, loginSchema, passwordResetSchema } from "@/lib/authValidation";
 import { useAuth } from "@/hooks/useAuth";
 import { SocialLoginButtons } from "@/components/auth/SocialLoginButtons";
+import { useBiometricAuth } from "@/hooks/useBiometricAuth";
+import { useGuestMode } from "@/hooks/useGuestMode";
 
 // Social provider icons
 const GoogleIcon = () => (
@@ -66,6 +68,11 @@ const Auth = () => {
   const passwordResetRateLimit = useRateLimit({ maxAttempts: 3, windowMs: 5 * 60 * 1000, identifier: 'password-reset' });
   const resendVerificationRateLimit = useRateLimit({ maxAttempts: 3, windowMs: 5 * 60 * 1000, identifier: 'resend-verification' });
   const magicLinkRateLimit = useRateLimit({ maxAttempts: 3, windowMs: 5 * 60 * 1000, identifier: 'magic-link' });
+  
+  // Biometric and guest mode
+  const biometric = useBiometricAuth();
+  const { enterGuestMode } = useGuestMode();
+  const [isBiometricLoading, setIsBiometricLoading] = useState(false);
 
   // Check server-side rate limit on mount
   useEffect(() => {
@@ -587,6 +594,69 @@ const Auth = () => {
     setIsMagicLinkLoading(false);
   };
 
+  // Handle biometric authentication
+  const handleBiometricAuth = async () => {
+    if (!biometric.isRegistered) {
+      toast({
+        title: "No Biometric Credentials",
+        description: "Please sign in with your password first, then enable biometric authentication in settings.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsBiometricLoading(true);
+    
+    const userId = await biometric.authenticateBiometric();
+    
+    if (userId) {
+      // For biometric auth, we need to restore the session
+      // This is a simplified flow - in production, you'd verify against the server
+      const rememberMeStored = localStorage.getItem('minidrama_remember_me');
+      
+      toast({
+        title: "Biometric Authentication",
+        description: "Verifying your identity...",
+      });
+      
+      // Check if there's a stored session that matches
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (session && session.user.id === userId) {
+        toast({
+          title: "Welcome back!",
+          description: "Signed in with biometrics",
+        });
+        await redirectAfterAuth(session.user.id);
+      } else {
+        toast({
+          title: "Session Expired",
+          description: "Please sign in with your password to continue.",
+          variant: "destructive",
+        });
+        biometric.removeBiometric();
+      }
+    } else if (biometric.error) {
+      toast({
+        title: "Biometric Failed",
+        description: biometric.error,
+        variant: "destructive",
+      });
+    }
+    
+    setIsBiometricLoading(false);
+  };
+
+  // Handle guest mode
+  const handleGuestMode = () => {
+    enterGuestMode();
+    toast({
+      title: "Welcome, Guest!",
+      description: "You're exploring MiniDrama. Some features are limited.",
+    });
+    navigate("/dashboard");
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background to-secondary/20 p-4">
       <Card className="w-full max-w-md">
@@ -779,6 +849,47 @@ const Auth = () => {
                 >
                   <Wand2 className="mr-2 h-4 w-4" />
                   Sign in with Magic Link
+                </Button>
+                
+                {/* Biometric Authentication */}
+                {biometric.isAvailable && biometric.isRegistered && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full"
+                    onClick={handleBiometricAuth}
+                    disabled={isLoading || isBiometricLoading}
+                  >
+                    {isBiometricLoading ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Fingerprint className="mr-2 h-4 w-4" />
+                    )}
+                    Sign in with Biometrics
+                  </Button>
+                )}
+                
+                {/* Guest Mode */}
+                <div className="relative pt-2">
+                  <div className="absolute inset-0 flex items-center">
+                    <Separator className="w-full" />
+                  </div>
+                  <div className="relative flex justify-center text-xs uppercase">
+                    <span className="bg-card px-2 text-muted-foreground">
+                      Just browsing?
+                    </span>
+                  </div>
+                </div>
+                
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="w-full text-muted-foreground hover:text-foreground"
+                  onClick={handleGuestMode}
+                  disabled={isLoading}
+                >
+                  <UserCircle className="mr-2 h-4 w-4" />
+                  Continue as Guest
                 </Button>
               </form>
             </TabsContent>

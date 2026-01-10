@@ -1,5 +1,6 @@
 import { ReactNode } from 'react';
 import { Header } from '@/components/Header';
+import { GuestBanner } from '@/components/auth/GuestBanner';
 import { cn } from '@/lib/utils';
 
 interface MainLayoutProps {
@@ -29,6 +30,7 @@ export function MainLayout({
 }: MainLayoutProps) {
   return (
     <div className={cn('min-h-screen', backgroundClasses[background], className)}>
+      <GuestBanner />
       {showHeader && <Header />}
       <main id="main-content" tabIndex={-1} className="outline-none">
         {children}
