@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { 
@@ -19,7 +20,11 @@ import {
   Trash2,
   Save,
   History,
-  Code
+  Code,
+  AlertCircle,
+  Info,
+  ChevronDown,
+  FileJson
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -37,6 +42,7 @@ interface TestResult {
   };
   response: any;
   error?: string;
+  validationErrors?: string[];
 }
 
 interface SavedRequest {
@@ -47,17 +53,257 @@ interface SavedRequest {
   body: string;
 }
 
-const ENDPOINTS = [
-  { path: 'login-rate-limit', label: 'Login Rate Limit', auth: 'public' },
-  { path: 'demo-viral-score', label: 'Demo Viral Score', auth: 'public' },
-  { path: 'check-subscription', label: 'Check Subscription', auth: 'user' },
-  { path: 'get-user-scripts', label: 'Get User Scripts', auth: 'user' },
-  { path: 'fetch-trends', label: 'Fetch Trends', auth: 'user' },
-  { path: 'analyze-script', label: 'Analyze Script', auth: 'user' },
-  { path: 'security-headers', label: 'Security Headers', auth: 'admin' },
-  { path: 'get-security-events', label: 'Get Security Events', auth: 'admin' },
-  { path: 'admin-get-users', label: 'Admin Get Users', auth: 'admin' },
-  { path: 'send-security-digest', label: 'Send Security Digest', auth: 'admin' },
+interface EndpointSchema {
+  path: string;
+  label: string;
+  auth: 'public' | 'user' | 'admin' | 'service';
+  description: string;
+  requestSchema: {
+    properties: Record<string, {
+      type: string;
+      required?: boolean;
+      description: string;
+      enum?: string[];
+      example?: any;
+    }>;
+  };
+  responseSchema: {
+    success: Record<string, { type: string; description: string }>;
+    error?: Record<string, { type: string; description: string }>;
+  };
+}
+
+const ENDPOINT_SCHEMAS: EndpointSchema[] = [
+  {
+    path: 'login-rate-limit',
+    label: 'Login Rate Limit',
+    auth: 'public',
+    description: 'Check and enforce login rate limits with CAPTCHA support',
+    requestSchema: {
+      properties: {
+        action: {
+          type: 'string',
+          required: true,
+          description: 'The action to perform',
+          enum: ['check', 'record_attempt', 'reset'],
+          example: 'check',
+        },
+        success: {
+          type: 'boolean',
+          description: 'Whether the login attempt was successful (for record_attempt)',
+          example: true,
+        },
+        captchaSolved: {
+          type: 'boolean',
+          description: 'Whether CAPTCHA was solved',
+          example: false,
+        },
+      },
+    },
+    responseSchema: {
+      success: {
+        allowed: { type: 'boolean', description: 'Whether the action is allowed' },
+        blocked: { type: 'boolean', description: 'Whether the IP is blocked' },
+        remainingAttempts: { type: 'number', description: 'Remaining login attempts' },
+        requiresCaptcha: { type: 'boolean', description: 'Whether CAPTCHA is required' },
+      },
+      error: {
+        blocked: { type: 'boolean', description: 'IP is blocked' },
+        retryAfterSeconds: { type: 'number', description: 'Seconds until retry allowed' },
+      },
+    },
+  },
+  {
+    path: 'demo-viral-score',
+    label: 'Demo Viral Score',
+    auth: 'public',
+    description: 'Calculate viral score for demo content',
+    requestSchema: {
+      properties: {
+        content: {
+          type: 'string',
+          required: true,
+          description: 'The content to analyze',
+          example: 'This is my viral script about...',
+        },
+      },
+    },
+    responseSchema: {
+      success: {
+        viralScore: { type: 'number', description: 'Viral score from 0-100' },
+        hookStrength: { type: 'number', description: 'Hook strength score' },
+        emotionalImpact: { type: 'number', description: 'Emotional impact score' },
+      },
+    },
+  },
+  {
+    path: 'analyze-script',
+    label: 'Analyze Script',
+    auth: 'user',
+    description: 'Analyze script for viral potential',
+    requestSchema: {
+      properties: {
+        content: {
+          type: 'string',
+          required: true,
+          description: 'Script content to analyze',
+          example: 'POV: You just discovered...',
+        },
+        niche: {
+          type: 'string',
+          description: 'Content niche for context',
+          example: 'comedy',
+        },
+      },
+    },
+    responseSchema: {
+      success: {
+        viralScore: { type: 'number', description: 'Overall viral potential' },
+        metrics: { type: 'object', description: 'Detailed scoring metrics' },
+        recommendations: { type: 'array', description: 'Improvement suggestions' },
+      },
+    },
+  },
+  {
+    path: 'get-security-events',
+    label: 'Get Security Events',
+    auth: 'admin',
+    description: 'Retrieve security events for monitoring',
+    requestSchema: {
+      properties: {
+        limit: {
+          type: 'number',
+          description: 'Maximum events to return',
+          example: 50,
+        },
+      },
+    },
+    responseSchema: {
+      success: {
+        events: { type: 'array', description: 'List of security events' },
+        total: { type: 'number', description: 'Total event count' },
+      },
+    },
+  },
+  {
+    path: 'send-security-digest',
+    label: 'Send Security Digest',
+    auth: 'admin',
+    description: 'Send security digest email to admins',
+    requestSchema: {
+      properties: {
+        digestType: {
+          type: 'string',
+          required: true,
+          description: 'Type of digest to send',
+          enum: ['daily', 'weekly'],
+          example: 'daily',
+        },
+        adminEmails: {
+          type: 'array',
+          description: 'Optional list of additional email recipients',
+          example: ['admin@example.com'],
+        },
+      },
+    },
+    responseSchema: {
+      success: {
+        success: { type: 'boolean', description: 'Whether digest was sent' },
+        emailsSent: { type: 'number', description: 'Number of emails sent' },
+        summary: { type: 'object', description: 'Security summary data' },
+      },
+    },
+  },
+  {
+    path: 'check-subscription',
+    label: 'Check Subscription',
+    auth: 'user',
+    description: 'Check user subscription status',
+    requestSchema: {
+      properties: {},
+    },
+    responseSchema: {
+      success: {
+        subscribed: { type: 'boolean', description: 'Whether user is subscribed' },
+        tier: { type: 'string', description: 'Subscription tier' },
+        expiresAt: { type: 'string', description: 'Subscription expiry date' },
+      },
+    },
+  },
+  {
+    path: 'fetch-trends',
+    label: 'Fetch Trends',
+    auth: 'user',
+    description: 'Fetch trending topics',
+    requestSchema: {
+      properties: {
+        platform: {
+          type: 'string',
+          description: 'Platform to filter by',
+          example: 'tiktok',
+        },
+      },
+    },
+    responseSchema: {
+      success: {
+        trends: { type: 'array', description: 'List of trending topics' },
+      },
+    },
+  },
+  {
+    path: 'admin-get-users',
+    label: 'Admin Get Users',
+    auth: 'admin',
+    description: 'Get all users (admin only)',
+    requestSchema: {
+      properties: {
+        limit: {
+          type: 'number',
+          description: 'Maximum users to return',
+          example: 50,
+        },
+        offset: {
+          type: 'number',
+          description: 'Pagination offset',
+          example: 0,
+        },
+      },
+    },
+    responseSchema: {
+      success: {
+        users: { type: 'array', description: 'List of users' },
+        total: { type: 'number', description: 'Total user count' },
+      },
+    },
+  },
+  {
+    path: 'security-headers',
+    label: 'Security Headers',
+    auth: 'admin',
+    description: 'Get security headers configuration',
+    requestSchema: {
+      properties: {},
+    },
+    responseSchema: {
+      success: {
+        headers: { type: 'array', description: 'List of security headers' },
+      },
+    },
+  },
+  {
+    path: 'get-user-scripts',
+    label: 'Get User Scripts',
+    auth: 'user',
+    description: 'Get user scripts',
+    requestSchema: {
+      properties: {},
+    },
+    responseSchema: {
+      success: {
+        scripts: { type: 'array', description: 'List of user scripts' },
+      },
+    },
+  },
 ];
 
 export const ApiTestingSandbox = () => {
@@ -71,10 +317,79 @@ export const ApiTestingSandbox = () => {
     return saved ? JSON.parse(saved) : [];
   });
   const [saveName, setSaveName] = useState('');
+  const [showSchema, setShowSchema] = useState(true);
+
+  const selectedSchema = useMemo(() => 
+    ENDPOINT_SCHEMAS.find(e => e.path === endpoint),
+    [endpoint]
+  );
+
+  const validateRequest = (bodyStr: string): string[] => {
+    const errors: string[] = [];
+    
+    if (!selectedSchema) return errors;
+
+    try {
+      const parsed = bodyStr.trim() ? JSON.parse(bodyStr) : {};
+      
+      // Check required fields
+      Object.entries(selectedSchema.requestSchema.properties).forEach(([key, prop]) => {
+        if (prop.required && (parsed[key] === undefined || parsed[key] === null || parsed[key] === '')) {
+          errors.push(`Missing required field: ${key}`);
+        }
+      });
+
+      // Check enum values
+      Object.entries(selectedSchema.requestSchema.properties).forEach(([key, prop]) => {
+        if (prop.enum && parsed[key] !== undefined && !prop.enum.includes(parsed[key])) {
+          errors.push(`Invalid value for ${key}. Must be one of: ${prop.enum.join(', ')}`);
+        }
+      });
+
+      // Type checking
+      Object.entries(selectedSchema.requestSchema.properties).forEach(([key, prop]) => {
+        if (parsed[key] !== undefined) {
+          const actualType = Array.isArray(parsed[key]) ? 'array' : typeof parsed[key];
+          if (prop.type !== actualType && !(prop.type === 'array' && actualType === 'object')) {
+            errors.push(`Invalid type for ${key}. Expected ${prop.type}, got ${actualType}`);
+          }
+        }
+      });
+    } catch (e) {
+      errors.push('Invalid JSON format');
+    }
+
+    return errors;
+  };
+
+  const generateExampleBody = () => {
+    if (!selectedSchema) return;
+    
+    const example: Record<string, any> = {};
+    Object.entries(selectedSchema.requestSchema.properties).forEach(([key, prop]) => {
+      if (prop.example !== undefined) {
+        example[key] = prop.example;
+      } else if (prop.enum) {
+        example[key] = prop.enum[0];
+      } else if (prop.required) {
+        switch (prop.type) {
+          case 'string': example[key] = ''; break;
+          case 'number': example[key] = 0; break;
+          case 'boolean': example[key] = false; break;
+          case 'array': example[key] = []; break;
+          case 'object': example[key] = {}; break;
+        }
+      }
+    });
+    
+    setBody(JSON.stringify(example, null, 2));
+    toast.success('Generated example request body');
+  };
 
   const executeRequest = async () => {
     setLoading(true);
     const startTime = performance.now();
+    const validationErrors = validateRequest(body);
 
     try {
       let parsedBody = {};
@@ -102,7 +417,8 @@ export const ApiTestingSandbox = () => {
         timestamp: new Date(),
         request: { body },
         response: error || data,
-        error: error?.message
+        error: error?.message,
+        validationErrors: validationErrors.length > 0 ? validationErrors : undefined,
       };
 
       setResults(prev => [result, ...prev.slice(0, 19)]);
@@ -125,7 +441,8 @@ export const ApiTestingSandbox = () => {
         timestamp: new Date(),
         request: { body },
         response: null,
-        error: error.message
+        error: error.message,
+        validationErrors: validationErrors.length > 0 ? validationErrors : undefined,
       };
 
       setResults(prev => [result, ...prev.slice(0, 19)]);
@@ -186,7 +503,7 @@ export const ApiTestingSandbox = () => {
     return 'text-red-500';
   };
 
-  const selectedEndpoint = ENDPOINTS.find(e => e.path === endpoint);
+  const currentValidationErrors = useMemo(() => validateRequest(body), [body, endpoint]);
 
   return (
     <Card>
@@ -196,13 +513,17 @@ export const ApiTestingSandbox = () => {
           API Testing Sandbox
         </CardTitle>
         <CardDescription>
-          Test edge functions directly from the admin panel
+          Test edge functions with request validation and schema documentation
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <Tabs defaultValue="request" className="space-y-4">
           <TabsList>
             <TabsTrigger value="request">Request</TabsTrigger>
+            <TabsTrigger value="schema">
+              <FileJson className="h-4 w-4 mr-1" />
+              Schema
+            </TabsTrigger>
             <TabsTrigger value="saved">
               Saved ({savedRequests.length})
             </TabsTrigger>
@@ -233,7 +554,7 @@ export const ApiTestingSandbox = () => {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {ENDPOINTS.map(ep => (
+                    {ENDPOINT_SCHEMAS.map(ep => (
                       <SelectItem key={ep.path} value={ep.path}>
                         <div className="flex items-center gap-2">
                           <span>{ep.label}</span>
@@ -248,33 +569,57 @@ export const ApiTestingSandbox = () => {
               </div>
             </div>
 
-            {/* Auth Info */}
-            {selectedEndpoint && (
-              <div className="text-sm text-muted-foreground flex items-center gap-2">
-                <span>Authentication:</span>
-                <Badge variant={
-                  selectedEndpoint.auth === 'public' ? 'secondary' :
-                  selectedEndpoint.auth === 'admin' ? 'destructive' : 'default'
-                }>
-                  {selectedEndpoint.auth === 'public' ? 'Public' :
-                   selectedEndpoint.auth === 'admin' ? 'Admin Required' : 'User Required'}
-                </Badge>
-                {selectedEndpoint.auth !== 'public' && (
-                  <span className="text-xs">(Using your current session)</span>
-                )}
+            {/* Endpoint Description */}
+            {selectedSchema && (
+              <div className="text-sm text-muted-foreground flex items-start gap-2 p-3 rounded-lg bg-muted/30">
+                <Info className="h-4 w-4 mt-0.5 shrink-0" />
+                <div>
+                  <p>{selectedSchema.description}</p>
+                  <Badge variant={
+                    selectedSchema.auth === 'public' ? 'secondary' :
+                    selectedSchema.auth === 'admin' ? 'destructive' : 'default'
+                  } className="mt-1">
+                    {selectedSchema.auth === 'public' ? 'Public' :
+                     selectedSchema.auth === 'admin' ? 'Admin Required' : 'User Required'}
+                  </Badge>
+                </div>
               </div>
             )}
 
             {/* Request Body */}
             <div className="space-y-2">
-              <Label>Request Body (JSON)</Label>
+              <div className="flex items-center justify-between">
+                <Label>Request Body (JSON)</Label>
+                <Button variant="ghost" size="sm" onClick={generateExampleBody}>
+                  <FileJson className="h-4 w-4 mr-1" />
+                  Generate Example
+                </Button>
+              </div>
               <Textarea
                 value={body}
                 onChange={(e) => setBody(e.target.value)}
                 placeholder='{"key": "value"}'
-                className="font-mono text-sm min-h-[150px]"
+                className={cn(
+                  "font-mono text-sm min-h-[150px]",
+                  currentValidationErrors.length > 0 && "border-yellow-500"
+                )}
               />
             </div>
+
+            {/* Validation Errors */}
+            {currentValidationErrors.length > 0 && (
+              <div className="rounded-lg border border-yellow-500/50 bg-yellow-500/10 p-3 space-y-1">
+                <div className="flex items-center gap-2 text-yellow-600 dark:text-yellow-400 font-medium text-sm">
+                  <AlertCircle className="h-4 w-4" />
+                  Validation Warnings
+                </div>
+                <ul className="text-sm text-yellow-600 dark:text-yellow-400 space-y-1 ml-6 list-disc">
+                  {currentValidationErrors.map((error, i) => (
+                    <li key={i}>{error}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
 
             {/* Execute Button */}
             <div className="flex gap-2">
@@ -332,6 +677,100 @@ export const ApiTestingSandbox = () => {
                     {JSON.stringify(results[0].response, null, 2)}
                   </pre>
                 </ScrollArea>
+              </div>
+            )}
+          </TabsContent>
+
+          {/* Schema Tab */}
+          <TabsContent value="schema" className="space-y-4">
+            {selectedSchema ? (
+              <>
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <FileJson className="h-4 w-4" />
+                      Request Schema: {selectedSchema.label}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {Object.keys(selectedSchema.requestSchema.properties).length === 0 ? (
+                      <p className="text-sm text-muted-foreground">No request body required</p>
+                    ) : (
+                      <div className="space-y-3">
+                        {Object.entries(selectedSchema.requestSchema.properties).map(([key, prop]) => (
+                          <div key={key} className="rounded-lg border p-3 space-y-1">
+                            <div className="flex items-center gap-2">
+                              <code className="font-mono text-sm text-primary">{key}</code>
+                              <Badge variant="outline" className="text-xs">{prop.type}</Badge>
+                              {prop.required && <Badge variant="destructive" className="text-xs">required</Badge>}
+                            </div>
+                            <p className="text-sm text-muted-foreground">{prop.description}</p>
+                            {prop.enum && (
+                              <div className="flex gap-1 flex-wrap mt-1">
+                                <span className="text-xs text-muted-foreground">Values:</span>
+                                {prop.enum.map(v => (
+                                  <Badge key={v} variant="secondary" className="text-xs font-mono">{v}</Badge>
+                                ))}
+                              </div>
+                            )}
+                            {prop.example !== undefined && (
+                              <p className="text-xs text-muted-foreground">
+                                Example: <code className="font-mono">{JSON.stringify(prop.example)}</code>
+                              </p>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <CheckCircle className="h-4 w-4 text-green-500" />
+                      Response Schema (Success)
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2">
+                      {Object.entries(selectedSchema.responseSchema.success).map(([key, prop]) => (
+                        <div key={key} className="flex items-center gap-2 text-sm">
+                          <code className="font-mono text-primary">{key}</code>
+                          <Badge variant="outline" className="text-xs">{prop.type}</Badge>
+                          <span className="text-muted-foreground">— {prop.description}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {selectedSchema.responseSchema.error && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <XCircle className="h-4 w-4 text-red-500" />
+                        Response Schema (Error)
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-2">
+                        {Object.entries(selectedSchema.responseSchema.error).map(([key, prop]) => (
+                          <div key={key} className="flex items-center gap-2 text-sm">
+                            <code className="font-mono text-primary">{key}</code>
+                            <Badge variant="outline" className="text-xs">{prop.type}</Badge>
+                            <span className="text-muted-foreground">— {prop.description}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+              </>
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                <FileJson className="mx-auto h-8 w-8 mb-2 opacity-50" />
+                <p>Select an endpoint to view its schema</p>
               </div>
             )}
           </TabsContent>
@@ -396,42 +835,58 @@ export const ApiTestingSandbox = () => {
                 <ScrollArea className="h-[400px]">
                   <div className="space-y-2">
                     {results.map(result => (
-                      <div
-                        key={result.id}
-                        className="p-3 rounded-lg border bg-card space-y-2"
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            {result.status < 400 ? (
-                              <CheckCircle className="h-4 w-4 text-green-500" />
-                            ) : (
-                              <XCircle className="h-4 w-4 text-red-500" />
+                      <Collapsible key={result.id}>
+                        <div className="p-3 rounded-lg border bg-card space-y-2">
+                          <CollapsibleTrigger className="w-full">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                {result.status < 400 ? (
+                                  <CheckCircle className="h-4 w-4 text-green-500" />
+                                ) : (
+                                  <XCircle className="h-4 w-4 text-red-500" />
+                                )}
+                                <span className="font-medium">{result.endpoint}</span>
+                                <Badge variant="outline" className="font-mono text-xs">
+                                  {result.method}
+                                </Badge>
+                                {result.validationErrors && (
+                                  <Badge variant="secondary" className="text-xs">
+                                    <AlertCircle className="h-3 w-3 mr-1" />
+                                    Warnings
+                                  </Badge>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                <Badge className={cn("font-mono", getStatusColor(result.status))}>
+                                  {result.status}
+                                </Badge>
+                                <span>{result.duration}ms</span>
+                                <span>{result.timestamp.toLocaleTimeString()}</span>
+                                <ChevronDown className="h-4 w-4" />
+                              </div>
+                            </div>
+                          </CollapsibleTrigger>
+                          <CollapsibleContent>
+                            {result.error && (
+                              <p className="text-sm text-destructive mt-2">{result.error}</p>
                             )}
-                            <span className="font-medium">{result.endpoint}</span>
-                            <Badge variant="outline" className="font-mono text-xs">
-                              {result.method}
-                            </Badge>
-                          </div>
-                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                            <Badge className={cn("font-mono", getStatusColor(result.status))}>
-                              {result.status}
-                            </Badge>
-                            <span>{result.duration}ms</span>
-                            <span>{result.timestamp.toLocaleTimeString()}</span>
-                          </div>
+                            {result.validationErrors && (
+                              <div className="mt-2 p-2 rounded bg-yellow-500/10 text-sm">
+                                <p className="font-medium text-yellow-600">Validation Warnings:</p>
+                                <ul className="list-disc ml-4 text-yellow-600">
+                                  {result.validationErrors.map((e, i) => <li key={i}>{e}</li>)}
+                                </ul>
+                              </div>
+                            )}
+                            <div className="mt-2">
+                              <p className="text-xs font-medium text-muted-foreground mb-1">Response:</p>
+                              <pre className="text-xs font-mono bg-muted/30 p-2 rounded overflow-x-auto">
+                                {JSON.stringify(result.response, null, 2)}
+                              </pre>
+                            </div>
+                          </CollapsibleContent>
                         </div>
-                        {result.error && (
-                          <p className="text-sm text-destructive">{result.error}</p>
-                        )}
-                        <details>
-                          <summary className="text-sm text-muted-foreground cursor-pointer hover:text-foreground">
-                            View Response
-                          </summary>
-                          <pre className="mt-2 text-xs font-mono bg-muted/30 p-2 rounded overflow-x-auto">
-                            {JSON.stringify(result.response, null, 2)}
-                          </pre>
-                        </details>
-                      </div>
+                      </Collapsible>
                     ))}
                   </div>
                 </ScrollArea>
