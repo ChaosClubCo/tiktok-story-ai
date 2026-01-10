@@ -10,9 +10,10 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, HelpCircle, Mail, Phone, MapPin, RefreshCw, ShieldAlert, Clock, Check } from "lucide-react";
+import { Loader2, HelpCircle, Mail, Phone, MapPin, RefreshCw, ShieldAlert, Clock, Check, Wand2 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { PasswordStrengthIndicator } from "@/components/auth/PasswordStrengthIndicator";
+import { PasswordInput } from "@/components/auth/PasswordInput";
 import { useSecurityMonitoring } from "@/hooks/useSecurityMonitoring";
 import { useRateLimit } from "@/hooks/useRateLimit";
 import { useLoginRateLimit } from "@/hooks/useLoginRateLimit";
@@ -58,8 +59,13 @@ const Auth = () => {
   const [resendEmail, setResendEmail] = useState("");
   const [isResendLoading, setIsResendLoading] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
+  const [showMagicLink, setShowMagicLink] = useState(false);
+  const [magicLinkEmail, setMagicLinkEmail] = useState("");
+  const [isMagicLinkLoading, setIsMagicLinkLoading] = useState(false);
+  const [magicLinkSent, setMagicLinkSent] = useState(false);
   const passwordResetRateLimit = useRateLimit({ maxAttempts: 3, windowMs: 5 * 60 * 1000, identifier: 'password-reset' });
   const resendVerificationRateLimit = useRateLimit({ maxAttempts: 3, windowMs: 5 * 60 * 1000, identifier: 'resend-verification' });
+  const magicLinkRateLimit = useRateLimit({ maxAttempts: 3, windowMs: 5 * 60 * 1000, identifier: 'magic-link' });
 
   // Check server-side rate limit on mount
   useEffect(() => {
@@ -527,6 +533,60 @@ const Auth = () => {
     setIsResendLoading(false);
   };
 
+  const handleMagicLink = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    // Check rate limiting
+    const rateLimitCheck = magicLinkRateLimit.checkRateLimit();
+    if (!rateLimitCheck.allowed) {
+      toast({
+        variant: "destructive",
+        title: "Too Many Requests",
+        description: `Please wait ${rateLimitCheck.retryAfter} seconds before requesting another magic link.`,
+      });
+      return;
+    }
+    
+    setIsMagicLinkLoading(true);
+
+    if (!magicLinkEmail || !magicLinkEmail.includes('@')) {
+      toast({
+        variant: "destructive",
+        title: "Invalid Email",
+        description: "Please enter a valid email address.",
+      });
+      setIsMagicLinkLoading(false);
+      return;
+    }
+
+    const { error } = await supabase.auth.signInWithOtp({
+      email: magicLinkEmail,
+      options: {
+        emailRedirectTo: `${window.location.origin}/dashboard`,
+      },
+    });
+
+    if (error) {
+      let errorMessage = error.message;
+      if (error.message.toLowerCase().includes('rate limit')) {
+        errorMessage = "Too many requests. Please wait a few minutes before trying again.";
+      }
+      
+      toast({
+        title: "Magic Link Failed",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    } else {
+      setMagicLinkSent(true);
+      toast({
+        title: "Magic Link Sent!",
+        description: "Check your email for a sign-in link. It will expire in 1 hour.",
+      });
+    }
+    setIsMagicLinkLoading(false);
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background to-secondary/20 p-4">
       <Card className="w-full max-w-md">
@@ -605,13 +665,13 @@ const Auth = () => {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="signin-password">Password</Label>
-                  <Input
+                  <PasswordInput
                     id="signin-password"
-                    type="password"
                     placeholder="Enter your password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     disabled={isLoading}
+                    autoComplete="current-password"
                   />
                 </div>
 
@@ -694,6 +754,32 @@ const Auth = () => {
                 </div>
                 
                 <SocialLoginButtons disabled={isLoading} />
+                
+                {/* Magic Link Option */}
+                <div className="relative">
+                  <div className="absolute inset-0 flex items-center">
+                    <Separator className="w-full" />
+                  </div>
+                  <div className="relative flex justify-center text-xs uppercase">
+                    <span className="bg-card px-2 text-muted-foreground">
+                      Or use passwordless
+                    </span>
+                  </div>
+                </div>
+                
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => {
+                    setMagicLinkEmail(email);
+                    setShowMagicLink(true);
+                  }}
+                  disabled={isLoading}
+                >
+                  <Wand2 className="mr-2 h-4 w-4" />
+                  Sign in with Magic Link
+                </Button>
               </form>
             </TabsContent>
             
@@ -712,13 +798,13 @@ const Auth = () => {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="signup-password">Password</Label>
-                  <Input
+                  <PasswordInput
                     id="signup-password"
-                    type="password"
                     placeholder="Create a strong password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     disabled={isLoading}
+                    autoComplete="new-password"
                   />
                   <PasswordStrengthIndicator password={password} />
                 </div>
@@ -897,6 +983,108 @@ const Auth = () => {
               </Button>
             </div>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Magic Link Dialog */}
+      <Dialog open={showMagicLink} onOpenChange={(open) => {
+        setShowMagicLink(open);
+        if (!open) {
+          setMagicLinkSent(false);
+        }
+      }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Wand2 className="h-5 w-5" />
+              Sign in with Magic Link
+            </DialogTitle>
+            <DialogDescription>
+              {magicLinkSent 
+                ? "Check your email for the magic link. Click it to sign in instantly."
+                : "Enter your email and we'll send you a secure link to sign in without a password."
+              }
+            </DialogDescription>
+          </DialogHeader>
+          
+          {magicLinkSent ? (
+            <div className="space-y-4">
+              <Alert className="border-green-500/50 bg-green-500/10">
+                <Check className="h-4 w-4 text-green-600" />
+                <AlertDescription className="text-green-700 dark:text-green-400">
+                  Magic link sent to <strong>{magicLinkEmail}</strong>
+                </AlertDescription>
+              </Alert>
+              <div className="space-y-2 text-sm text-muted-foreground">
+                <p>• Check your inbox (and spam folder)</p>
+                <p>• The link expires in 1 hour</p>
+                <p>• Click the link to sign in instantly</p>
+              </div>
+              <div className="flex space-x-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setShowMagicLink(false);
+                    setMagicLinkSent(false);
+                    setMagicLinkEmail("");
+                  }}
+                  className="flex-1"
+                >
+                  Close
+                </Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => {
+                    setMagicLinkSent(false);
+                  }}
+                  className="flex-1"
+                >
+                  Send Again
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <form onSubmit={handleMagicLink} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="magic-email">Email</Label>
+                <Input
+                  id="magic-email"
+                  type="email"
+                  placeholder="Enter your email"
+                  value={magicLinkEmail}
+                  onChange={(e) => setMagicLinkEmail(e.target.value)}
+                  disabled={isMagicLinkLoading}
+                />
+              </div>
+              <Alert className="border-muted bg-muted/50">
+                <Wand2 className="h-4 w-4" />
+                <AlertDescription className="text-sm">
+                  No password needed! We'll send a secure link to your email. 
+                  Click it to sign in instantly.
+                </AlertDescription>
+              </Alert>
+              <div className="flex space-x-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setShowMagicLink(false);
+                    setMagicLinkEmail("");
+                  }}
+                  className="flex-1"
+                  disabled={isMagicLinkLoading}
+                >
+                  Cancel
+                </Button>
+                <Button type="submit" className="flex-1" disabled={isMagicLinkLoading}>
+                  {isMagicLinkLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Send Magic Link
+                </Button>
+              </div>
+            </form>
+          )}
         </DialogContent>
       </Dialog>
     </div>
