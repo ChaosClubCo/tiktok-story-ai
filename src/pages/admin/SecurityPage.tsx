@@ -5,13 +5,13 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { Shield, AlertTriangle, Activity, Key, RefreshCw, Clock, TrendingUp, Lock } from 'lucide-react';
+import { Shield, AlertTriangle, Activity, Key, RefreshCw, Clock, TrendingUp, Lock, Mail } from 'lucide-react';
 import { SecurityIndicator } from '@/components/SecurityIndicator';
 import { ApiKeyRotation } from '@/components/admin/ApiKeyRotation';
 import { Admin2FASettings } from '@/components/admin/Admin2FASettings';
 import { LiveSecurityFeed } from '@/components/admin/LiveSecurityFeed';
+import { SecurityDigestSettings } from '@/components/admin/SecurityDigestSettings';
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner';
-
 interface SecurityEvent {
   id: string;
   type: string;
@@ -186,9 +186,10 @@ export const SecurityPage = () => {
 
       {/* Main Content Tabs */}
       <Tabs defaultValue="live" className="space-y-4">
-        <TabsList>
+        <TabsList className="flex-wrap h-auto gap-1">
           <TabsTrigger value="live">Live Monitoring</TabsTrigger>
           <TabsTrigger value="events">Security Events</TabsTrigger>
+          <TabsTrigger value="digest">Email Digests</TabsTrigger>
           <TabsTrigger value="2fa">Two-Factor Auth</TabsTrigger>
           <TabsTrigger value="keys">API Key Rotation</TabsTrigger>
           <TabsTrigger value="headers">Security Headers</TabsTrigger>
@@ -238,6 +239,10 @@ export const SecurityPage = () => {
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="digest">
+          <SecurityDigestSettings />
         </TabsContent>
 
         <TabsContent value="2fa">
