@@ -159,14 +159,24 @@ Customized Shadcn components with:
 - `video_assets`: Generated media assets
 - `predictions_history`: AI analysis results
 - `ab_tests`: A/B testing experiments
+- `ab_test_variants`: Test variants
+- `ab_test_results`: Test metrics
 
 ### Security Tables
 - `profiles`: User profiles
 - `admin_roles`: Admin access control
 - `admin_audit_log`: Security audit trail
+- `admin_totp`: Admin 2FA secrets
+- `admin_2fa_attempts`: 2FA attempt tracking
 - `login_rate_limits`: IP-based rate limiting for login attempts
 - `security_alerts`: Security event notifications
 - `login_activity`: User login history
+- `user_totp`: User 2FA settings
+- `notification_preferences`: Email preferences
+
+### Recovery Tables (NEW)
+- `account_recovery_options`: Backup email and security questions
+- `recovery_rate_limits`: Rate limiting for recovery attempts
 
 ## Edge Functions
 
@@ -196,6 +206,10 @@ Customized Shadcn components with:
 - `admin-2fa`: Admin two-factor authentication
 - `get-login-activity`: Login history retrieval
 - `get-security-events`: Security event logs
+- `recovery-rate-limit`: Brute-force protection for recovery
+- `recovery-options`: Manage backup email/security questions
+- `verify-recovery`: Verify recovery attempts
+- `send-backup-verification`: Email verification codes
 
 ### Shared Utilities
 - `_shared/authHelpers.ts`: Authentication
@@ -204,6 +218,7 @@ Customized Shadcn components with:
 - `_shared/aiClient.ts`: AI integration
 - `_shared/rateLimit.ts`: Rate limiting utilities
 - `_shared/piiMasking.ts`: PII protection in logs
+- `_shared/serviceRoleAudit.ts`: Service role operation logging
 
 ## Security Architecture
 
