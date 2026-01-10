@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, createContext, useContext } from 'react';
 import { useAuth } from './useAuth';
+import { supabase } from '@/integrations/supabase/client';
 
 interface SecurityQuestion {
   id: string;
@@ -8,6 +9,10 @@ interface SecurityQuestion {
 
 interface RecoveryOptions {
   backupEmail: string | null;
+  backupEmailVerified: boolean;
+  pendingBackupEmail: string | null;
+  verificationToken: string | null;
+  verificationExpiry: string | null;
   securityQuestions: {
     questionId: string;
     answerHash: string;
@@ -52,13 +57,15 @@ const verifyAnswer = (answer: string, storedHash: string): boolean => {
 
 interface AccountRecoveryContextType extends AccountRecoveryState {
   saveBackupEmail: (email: string) => Promise<boolean>;
+  sendBackupEmailVerification: (email: string) => Promise<{ success: boolean; token?: string }>;
+  verifyBackupEmailCode: (code: string) => Promise<boolean>;
   removeBackupEmail: () => void;
   saveSecurityQuestions: (questions: { questionId: string; answer: string }[]) => Promise<boolean>;
   removeSecurityQuestions: () => void;
   verifySecurityAnswers: (answers: { questionId: string; answer: string }[]) => boolean;
   verifyBackupEmail: (email: string) => boolean;
   clearError: () => void;
-  getRecoveryStatus: () => { hasBackupEmail: boolean; hasSecurityQuestions: boolean; isComplete: boolean };
+  getRecoveryStatus: () => { hasBackupEmail: boolean; hasSecurityQuestions: boolean; isComplete: boolean; isEmailVerified: boolean };
 }
 
 const AccountRecoveryContext = createContext<AccountRecoveryContextType | undefined>(undefined);
@@ -69,6 +76,10 @@ export function AccountRecoveryProvider({ children }: { children: React.ReactNod
     isLoading: true,
     recoveryOptions: {
       backupEmail: null,
+      backupEmailVerified: false,
+      pendingBackupEmail: null,
+      verificationToken: null,
+      verificationExpiry: null,
       securityQuestions: [],
       recoverySetupComplete: false,
     },
@@ -85,7 +96,15 @@ export function AccountRecoveryProvider({ children }: { children: React.ReactNod
           if (user?.id && parsed.userId === user.id) {
             setState({
               isLoading: false,
-              recoveryOptions: parsed.options,
+              recoveryOptions: {
+                backupEmail: parsed.options.backupEmail || null,
+                backupEmailVerified: parsed.options.backupEmailVerified || false,
+                pendingBackupEmail: parsed.options.pendingBackupEmail || null,
+                verificationToken: parsed.options.verificationToken || null,
+                verificationExpiry: parsed.options.verificationExpiry || null,
+                securityQuestions: parsed.options.securityQuestions || [],
+                recoverySetupComplete: parsed.options.recoverySetupComplete || false,
+              },
               error: null,
             });
             return;
@@ -96,6 +115,10 @@ export function AccountRecoveryProvider({ children }: { children: React.ReactNod
           isLoading: false,
           recoveryOptions: {
             backupEmail: null,
+            backupEmailVerified: false,
+            pendingBackupEmail: null,
+            verificationToken: null,
+            verificationExpiry: null,
             securityQuestions: [],
             recoverySetupComplete: false,
           },
@@ -117,7 +140,7 @@ export function AccountRecoveryProvider({ children }: { children: React.ReactNod
   const saveToStorage = useCallback((options: RecoveryOptions) => {
     if (!user?.id) return;
     
-    const isComplete = !!(options.backupEmail || options.securityQuestions.length >= 2);
+    const isComplete = !!((options.backupEmail && options.backupEmailVerified) || options.securityQuestions.length >= 2);
     const updatedOptions = { ...options, recoverySetupComplete: isComplete };
     
     localStorage.setItem(STORAGE_KEY, JSON.stringify({
@@ -131,20 +154,84 @@ export function AccountRecoveryProvider({ children }: { children: React.ReactNod
     }));
   }, [user?.id]);
 
-  // Save backup email
-  const saveBackupEmail = useCallback(async (email: string): Promise<boolean> => {
+  // Send backup email verification code
+  const sendBackupEmailVerification = useCallback(async (email: string): Promise<{ success: boolean; token?: string }> => {
     setState(prev => ({ ...prev, isLoading: true, error: null }));
 
     try {
-      // Validate email format
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!emailRegex.test(email)) {
         throw new Error('Invalid email format');
       }
 
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        throw new Error('You must be signed in to add a backup email');
+      }
+
+      const { data, error } = await supabase.functions.invoke('send-backup-verification', {
+        body: { email },
+      });
+
+      if (error) throw error;
+
+      // Store pending verification
       const updatedOptions = {
         ...state.recoveryOptions,
-        backupEmail: email,
+        pendingBackupEmail: email,
+        verificationToken: data.token,
+        verificationExpiry: data.expiresAt,
+      };
+      
+      saveToStorage(updatedOptions);
+      setState(prev => ({ ...prev, isLoading: false }));
+      
+      return { success: true, token: data.token };
+    } catch (error: any) {
+      setState(prev => ({
+        ...prev,
+        isLoading: false,
+        error: error.message || 'Failed to send verification email',
+      }));
+      return { success: false };
+    }
+  }, [state.recoveryOptions, saveToStorage]);
+
+  // Verify backup email code
+  const verifyBackupEmailCode = useCallback(async (code: string): Promise<boolean> => {
+    setState(prev => ({ ...prev, isLoading: true, error: null }));
+
+    try {
+      const { verificationToken, pendingBackupEmail, verificationExpiry } = state.recoveryOptions;
+      
+      if (!verificationToken || !pendingBackupEmail) {
+        throw new Error('No pending verification found');
+      }
+
+      // Check expiry
+      if (verificationExpiry && new Date(verificationExpiry) < new Date()) {
+        throw new Error('Verification code has expired. Please request a new one.');
+      }
+
+      // Decode and verify
+      const decoded = JSON.parse(atob(verificationToken));
+      
+      if (decoded.code !== code) {
+        throw new Error('Invalid verification code');
+      }
+
+      if (decoded.email !== pendingBackupEmail) {
+        throw new Error('Email mismatch');
+      }
+
+      // Verification successful - save the email
+      const updatedOptions = {
+        ...state.recoveryOptions,
+        backupEmail: pendingBackupEmail,
+        backupEmailVerified: true,
+        pendingBackupEmail: null,
+        verificationToken: null,
+        verificationExpiry: null,
       };
       
       saveToStorage(updatedOptions);
@@ -154,17 +241,28 @@ export function AccountRecoveryProvider({ children }: { children: React.ReactNod
       setState(prev => ({
         ...prev,
         isLoading: false,
-        error: error.message || 'Failed to save backup email',
+        error: error.message || 'Failed to verify code',
       }));
       return false;
     }
   }, [state.recoveryOptions, saveToStorage]);
+
+  // Save backup email (legacy - now requires verification)
+  const saveBackupEmail = useCallback(async (email: string): Promise<boolean> => {
+    // This now just initiates verification
+    const result = await sendBackupEmailVerification(email);
+    return result.success;
+  }, [sendBackupEmailVerification]);
 
   // Remove backup email
   const removeBackupEmail = useCallback(() => {
     const updatedOptions = {
       ...state.recoveryOptions,
       backupEmail: null,
+      backupEmailVerified: false,
+      pendingBackupEmail: null,
+      verificationToken: null,
+      verificationExpiry: null,
     };
     saveToStorage(updatedOptions);
   }, [state.recoveryOptions, saveToStorage]);
@@ -245,10 +343,11 @@ export function AccountRecoveryProvider({ children }: { children: React.ReactNod
   // Get recovery status
   const getRecoveryStatus = useCallback(() => {
     const hasBackupEmail = !!state.recoveryOptions.backupEmail;
+    const isEmailVerified = state.recoveryOptions.backupEmailVerified;
     const hasSecurityQuestions = state.recoveryOptions.securityQuestions.length >= 2;
-    const isComplete = hasBackupEmail || hasSecurityQuestions;
+    const isComplete = (hasBackupEmail && isEmailVerified) || hasSecurityQuestions;
     
-    return { hasBackupEmail, hasSecurityQuestions, isComplete };
+    return { hasBackupEmail, hasSecurityQuestions, isComplete, isEmailVerified };
   }, [state.recoveryOptions]);
 
   return (
@@ -256,6 +355,8 @@ export function AccountRecoveryProvider({ children }: { children: React.ReactNod
       value={{
         ...state,
         saveBackupEmail,
+        sendBackupEmailVerification,
+        verifyBackupEmailCode,
         removeBackupEmail,
         saveSecurityQuestions,
         removeSecurityQuestions,
