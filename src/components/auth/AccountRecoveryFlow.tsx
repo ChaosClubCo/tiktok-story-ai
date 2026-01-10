@@ -5,7 +5,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
   KeyRound, 
   Mail, 
@@ -14,7 +13,8 @@ import {
   ArrowLeft, 
   CheckCircle2,
   AlertCircle,
-  Send
+  Send,
+  ShieldAlert
 } from 'lucide-react';
 import { SECURITY_QUESTIONS } from '@/hooks/useAccountRecovery';
 import { supabase } from '@/integrations/supabase/client';
@@ -31,13 +31,15 @@ export function AccountRecoveryFlow({ open, onOpenChange, onRecoverySuccess }: A
   const [step, setStep] = useState<RecoveryStep>('method');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [remainingAttempts, setRemainingAttempts] = useState<number | null>(null);
+  const [blockedUntil, setBlockedUntil] = useState<string | null>(null);
   
   // Email recovery state
+  const [userEmail, setUserEmail] = useState('');
   const [backupEmail, setBackupEmail] = useState('');
   const [emailSent, setEmailSent] = useState(false);
   
   // Security questions state
-  const [userEmail, setUserEmail] = useState('');
   const [selectedQuestions, setSelectedQuestions] = useState<{ questionId: string; answer: string }[]>([
     { questionId: '', answer: '' },
     { questionId: '', answer: '' },
@@ -46,9 +48,11 @@ export function AccountRecoveryFlow({ open, onOpenChange, onRecoverySuccess }: A
   const handleReset = () => {
     setStep('method');
     setError(null);
+    setRemainingAttempts(null);
+    setBlockedUntil(null);
+    setUserEmail('');
     setBackupEmail('');
     setEmailSent(false);
-    setUserEmail('');
     setSelectedQuestions([
       { questionId: '', answer: '' },
       { questionId: '', answer: '' },
@@ -61,8 +65,13 @@ export function AccountRecoveryFlow({ open, onOpenChange, onRecoverySuccess }: A
   };
 
   const handleEmailRecovery = async () => {
+    if (!userEmail || !userEmail.includes('@')) {
+      setError('Please enter your account email address');
+      return;
+    }
+
     if (!backupEmail || !backupEmail.includes('@')) {
-      setError('Please enter a valid email address');
+      setError('Please enter your backup email address');
       return;
     }
 
@@ -70,18 +79,37 @@ export function AccountRecoveryFlow({ open, onOpenChange, onRecoverySuccess }: A
     setError(null);
 
     try {
-      // Request password reset for the backup email
-      const { error: resetError } = await supabase.auth.resetPasswordForEmail(backupEmail, {
-        redirectTo: `${window.location.origin}/`,
+      const { data, error: fnError } = await supabase.functions.invoke('verify-recovery', {
+        body: {
+          method: 'backup_email',
+          email: userEmail,
+          backupEmail: backupEmail,
+        },
       });
 
-      if (resetError) {
-        throw resetError;
+      if (fnError) {
+        throw fnError;
+      }
+
+      if (data?.blocked) {
+        setBlockedUntil(data.blockedUntil);
+        setError(data.error || 'Too many attempts. Please try again later.');
+        return;
+      }
+
+      if (data?.error) {
+        setRemainingAttempts(data.remainingAttempts);
+        setError(data.error);
+        return;
       }
 
       setEmailSent(true);
     } catch (err: any) {
-      setError(err.message || 'Failed to send recovery email');
+      if (err.message?.includes('429') || err.message?.includes('Too many')) {
+        setError('Too many attempts. Please try again later.');
+      } else {
+        setError(err.message || 'Failed to verify backup email');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -104,61 +132,37 @@ export function AccountRecoveryFlow({ open, onOpenChange, onRecoverySuccess }: A
     setError(null);
 
     try {
-      // In a real implementation, this would verify against stored answers on the server
-      // For now, we'll check against localStorage (same as the hook)
-      const stored = localStorage.getItem('minidrama_recovery_options');
-      
-      if (!stored) {
-        setError('No recovery options found for this account. Please contact support.');
-        setIsLoading(false);
+      const { data, error: fnError } = await supabase.functions.invoke('verify-recovery', {
+        body: {
+          method: 'security_questions',
+          email: userEmail,
+          answers: validAnswers,
+        },
+      });
+
+      if (fnError) {
+        throw fnError;
+      }
+
+      if (data?.blocked) {
+        setBlockedUntil(data.blockedUntil);
+        setError(data.error || 'Too many attempts. Please try again later.');
         return;
       }
 
-      const parsed = JSON.parse(stored);
-      const storedQuestions = parsed.options?.securityQuestions || [];
-
-      if (storedQuestions.length === 0) {
-        setError('No security questions configured for this account.');
-        setIsLoading(false);
+      if (data?.error) {
+        setRemainingAttempts(data.remainingAttempts);
+        setError(data.error);
         return;
       }
 
-      // Hash and verify answers
-      const hashAnswer = (answer: string): string => {
-        const normalized = answer.toLowerCase().trim();
-        let hash = 0;
-        for (let i = 0; i < normalized.length; i++) {
-          const char = normalized.charCodeAt(i);
-          hash = ((hash << 5) - hash) + char;
-          hash = hash & hash;
-        }
-        return hash.toString(36);
-      };
-
-      let correctCount = 0;
-      for (const answer of validAnswers) {
-        const storedQuestion = storedQuestions.find((q: any) => q.questionId === answer.questionId);
-        if (storedQuestion && hashAnswer(answer.answer) === storedQuestion.answerHash) {
-          correctCount++;
-        }
-      }
-
-      if (correctCount >= 2) {
-        // Send password reset email
-        const { error: resetError } = await supabase.auth.resetPasswordForEmail(userEmail, {
-          redirectTo: `${window.location.origin}/`,
-        });
-
-        if (resetError) {
-          throw resetError;
-        }
-
-        setStep('success');
-      } else {
-        setError('Security answers do not match. Please try again or contact support.');
-      }
+      setStep('success');
     } catch (err: any) {
-      setError(err.message || 'Verification failed');
+      if (err.message?.includes('429') || err.message?.includes('Too many')) {
+        setError('Too many attempts. Please try again later.');
+      } else {
+        setError(err.message || 'Verification failed');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -172,6 +176,14 @@ export function AccountRecoveryFlow({ open, onOpenChange, onRecoverySuccess }: A
 
   const getUsedQuestionIds = () => {
     return selectedQuestions.map(q => q.questionId).filter(Boolean);
+  };
+
+  const formatBlockedTime = (isoString: string) => {
+    try {
+      return new Date(isoString).toLocaleTimeString();
+    } catch {
+      return 'later';
+    }
   };
 
   return (
@@ -193,7 +205,26 @@ export function AccountRecoveryFlow({ open, onOpenChange, onRecoverySuccess }: A
         {error && (
           <Alert variant="destructive">
             <AlertCircle className="h-4 w-4" />
-            <AlertDescription>{error}</AlertDescription>
+            <AlertDescription>
+              {error}
+              {remainingAttempts !== null && remainingAttempts > 0 && (
+                <span className="block mt-1 text-xs">
+                  {remainingAttempts} attempt{remainingAttempts !== 1 ? 's' : ''} remaining
+                </span>
+              )}
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {blockedUntil && (
+          <Alert variant="destructive" className="bg-destructive/10">
+            <ShieldAlert className="h-4 w-4" />
+            <AlertDescription>
+              <strong>Temporarily blocked</strong>
+              <span className="block mt-1">
+                Too many failed attempts. Try again after {formatBlockedTime(blockedUntil)}.
+              </span>
+            </AlertDescription>
           </Alert>
         )}
 
@@ -208,6 +239,7 @@ export function AccountRecoveryFlow({ open, onOpenChange, onRecoverySuccess }: A
                 variant="outline"
                 className="w-full justify-start h-auto py-4 px-4"
                 onClick={() => setStep('email-verify')}
+                disabled={!!blockedUntil}
               >
                 <div className="flex items-start gap-3">
                   <Mail className="h-5 w-5 mt-0.5 text-primary" />
@@ -224,6 +256,7 @@ export function AccountRecoveryFlow({ open, onOpenChange, onRecoverySuccess }: A
                 variant="outline"
                 className="w-full justify-start h-auto py-4 px-4"
                 onClick={() => setStep('security-questions')}
+                disabled={!!blockedUntil}
               >
                 <div className="flex items-start gap-3">
                   <HelpCircle className="h-5 w-5 mt-0.5 text-primary" />
@@ -251,12 +284,25 @@ export function AccountRecoveryFlow({ open, onOpenChange, onRecoverySuccess }: A
               onClick={() => {
                 setStep('method');
                 setError(null);
+                setRemainingAttempts(null);
               }}
               className="mb-2"
             >
               <ArrowLeft className="h-4 w-4 mr-2" />
               Back
             </Button>
+
+            <div className="space-y-2">
+              <Label htmlFor="account-email-recovery">Account Email</Label>
+              <Input
+                id="account-email-recovery"
+                type="email"
+                placeholder="Enter your account email"
+                value={userEmail}
+                onChange={(e) => setUserEmail(e.target.value)}
+                disabled={isLoading || !!blockedUntil}
+              />
+            </div>
 
             <div className="space-y-2">
               <Label htmlFor="backup-email-recovery">Backup Email Address</Label>
@@ -266,7 +312,7 @@ export function AccountRecoveryFlow({ open, onOpenChange, onRecoverySuccess }: A
                 placeholder="Enter your backup email"
                 value={backupEmail}
                 onChange={(e) => setBackupEmail(e.target.value)}
-                disabled={isLoading}
+                disabled={isLoading || !!blockedUntil}
               />
               <p className="text-xs text-muted-foreground">
                 Enter the backup email you configured for account recovery
@@ -275,18 +321,18 @@ export function AccountRecoveryFlow({ open, onOpenChange, onRecoverySuccess }: A
 
             <Button
               onClick={handleEmailRecovery}
-              disabled={isLoading || !backupEmail}
+              disabled={isLoading || !backupEmail || !userEmail || !!blockedUntil}
               className="w-full"
             >
               {isLoading ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Sending...
+                  Verifying...
                 </>
               ) : (
                 <>
                   <Send className="h-4 w-4 mr-2" />
-                  Send Recovery Link
+                  Verify & Send Recovery Link
                 </>
               )}
             </Button>
@@ -298,7 +344,7 @@ export function AccountRecoveryFlow({ open, onOpenChange, onRecoverySuccess }: A
             <Alert className="border-green-500/50 bg-green-500/10">
               <CheckCircle2 className="h-4 w-4 text-green-600" />
               <AlertDescription className="text-green-700 dark:text-green-400">
-                Recovery link sent to <strong>{backupEmail}</strong>
+                Recovery link sent to <strong>{userEmail}</strong>
               </AlertDescription>
             </Alert>
 
@@ -322,6 +368,7 @@ export function AccountRecoveryFlow({ open, onOpenChange, onRecoverySuccess }: A
               onClick={() => {
                 setStep('method');
                 setError(null);
+                setRemainingAttempts(null);
               }}
               className="mb-2"
             >
@@ -337,7 +384,7 @@ export function AccountRecoveryFlow({ open, onOpenChange, onRecoverySuccess }: A
                 placeholder="Enter your account email"
                 value={userEmail}
                 onChange={(e) => setUserEmail(e.target.value)}
-                disabled={isLoading}
+                disabled={isLoading || !!blockedUntil}
               />
             </div>
 
@@ -348,7 +395,7 @@ export function AccountRecoveryFlow({ open, onOpenChange, onRecoverySuccess }: A
                   <Select
                     value={q.questionId}
                     onValueChange={(value) => updateQuestion(index, 'questionId', value)}
-                    disabled={isLoading}
+                    disabled={isLoading || !!blockedUntil}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Select a question" />
@@ -367,7 +414,7 @@ export function AccountRecoveryFlow({ open, onOpenChange, onRecoverySuccess }: A
                     placeholder="Your answer"
                     value={q.answer}
                     onChange={(e) => updateQuestion(index, 'answer', e.target.value)}
-                    disabled={isLoading}
+                    disabled={isLoading || !!blockedUntil}
                   />
                 </div>
               ))}
@@ -375,7 +422,7 @@ export function AccountRecoveryFlow({ open, onOpenChange, onRecoverySuccess }: A
 
             <Button
               onClick={handleSecurityQuestionsVerify}
-              disabled={isLoading || selectedQuestions.filter(q => q.questionId && q.answer.trim()).length < 2}
+              disabled={isLoading || selectedQuestions.filter(q => q.questionId && q.answer.trim()).length < 2 || !!blockedUntil}
               className="w-full"
             >
               {isLoading ? (

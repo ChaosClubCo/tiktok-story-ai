@@ -87,3 +87,15 @@ verify_jwt = false
 
 [functions.send-security-alert]
 verify_jwt = false
+
+[functions.recovery-rate-limit]
+verify_jwt = false
+
+[functions.recovery-options]
+verify_jwt = true
+
+[functions.verify-recovery]
+verify_jwt = false
+
+[functions.send-backup-verification]
+verify_jwt = true
