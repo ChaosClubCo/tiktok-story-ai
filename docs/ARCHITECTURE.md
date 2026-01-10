@@ -85,6 +85,8 @@ project-root/
 - Content moderation
 - Security monitoring
 - API key rotation
+- **Analytics Dashboard**: Usage statistics, user metrics, API call charts
+- **System Health**: Edge function status, database stats, uptime tracking
 
 ## Data Flow
 
@@ -162,6 +164,9 @@ Customized Shadcn components with:
 - `profiles`: User profiles
 - `admin_roles`: Admin access control
 - `admin_audit_log`: Security audit trail
+- `login_rate_limits`: IP-based rate limiting for login attempts
+- `security_alerts`: Security event notifications
+- `login_activity`: User login history
 
 ## Edge Functions
 
@@ -182,12 +187,23 @@ Customized Shadcn components with:
 - `admin-get-content`: Content moderation
 - `verify-admin-access`: Admin verification
 - `rotate-api-key`: Key rotation
+- `log-admin-action`: Admin audit logging
+
+### Security Functions
+- `login-rate-limit`: Progressive rate limiting with CAPTCHA support
+- `send-security-alert`: Security notification emails via Resend
+- `user-2fa`: User two-factor authentication
+- `admin-2fa`: Admin two-factor authentication
+- `get-login-activity`: Login history retrieval
+- `get-security-events`: Security event logs
 
 ### Shared Utilities
 - `_shared/authHelpers.ts`: Authentication
 - `_shared/corsHeaders.ts`: CORS configuration
 - `_shared/errorHandler.ts`: Error handling
 - `_shared/aiClient.ts`: AI integration
+- `_shared/rateLimit.ts`: Rate limiting utilities
+- `_shared/piiMasking.ts`: PII protection in logs
 
 ## Security Architecture
 
@@ -207,10 +223,23 @@ Customized Shadcn components with:
 - SQL injection prevention
 - Rate limiting
 
+### Login Security
+- Progressive rate limiting (3/5/10/15 attempt thresholds)
+- CAPTCHA challenges after 3 failed attempts
+- IP-based blocking (30min → 1hr → 24hr escalation)
+- Security alert emails for blocked logins
+
+### Security Alerts
+- Email notifications via Resend API
+- Alert types: login_blocked, 2fa_enabled, 2fa_disabled, password_changed, suspicious_activity
+- User-accessible alert history in Settings
+- Audit logging for compliance
+
 ### Audit Logging
 - Admin actions logged
 - Security events tracked
 - User activity monitoring
+- Login attempt history
 
 ## Performance Optimization
 
