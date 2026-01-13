@@ -9,7 +9,7 @@ const corsHeaders = {
 interface SecurityEvent {
   type: 'auth_attempt' | 'rate_limit' | 'suspicious_activity' | 'csrf_attempt' | 'admin_action';
   severity: 'low' | 'medium' | 'high' | 'critical';
-  details: Record<string, any>;
+  details: Record<string, unknown>;
   timestamp: string;
   userAgent?: string;
   ip?: string;

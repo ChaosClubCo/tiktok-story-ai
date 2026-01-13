@@ -111,10 +111,10 @@ export const SubscriptionTiers = ({ currentTier }: SubscriptionTiersProps) => {
       setTimeout(() => {
         checkSubscription();
       }, 3000);
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: "Error",
-        description: error.message || "Failed to create checkout session",
+        description: error instanceof Error ? error.message : "Failed to create checkout session",
         variant: "destructive",
       });
     } finally {
@@ -135,10 +135,10 @@ export const SubscriptionTiers = ({ currentTier }: SubscriptionTiersProps) => {
 
       // Open customer portal in a new tab
       window.open(data.url, '_blank');
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: "Error",
-        description: error.message || "Failed to open customer portal",
+        description: error instanceof Error ? error.message : "Failed to open customer portal",
         variant: "destructive",
       });
     } finally {

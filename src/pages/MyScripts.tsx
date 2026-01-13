@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
@@ -14,6 +14,22 @@ import { ScriptVersionHistory } from "@/components/ScriptVersionHistory";
 import { useNavigate } from "react-router-dom";
 import { useAutoVersion } from "@/hooks/useAutoVersion";
 import { BranchSelector } from "@/components/branching/BranchSelector";
+
+interface ScriptScene {
+  id: number;
+  timeStamp: string;
+  dialogue: string;
+  action: string;
+  visual: string;
+  sound: string;
+}
+
+interface Script {
+  title: string;
+  hook: string;
+  scenes: ScriptScene[];
+  hashtags: string[];
+}
 
 interface SavedScript {
   id: string;
@@ -67,9 +83,9 @@ const MyScripts = () => {
     if (user) {
       fetchScripts();
     }
-  }, [user]);
+  }, [user, fetchScripts]);
 
-  const fetchScripts = async () => {
+  const fetchScripts = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from('scripts')
@@ -89,7 +105,7 @@ const MyScripts = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user, toast]);
 
   const handleDelete = async (scriptId: string) => {
     try {
@@ -132,7 +148,7 @@ const MyScripts = () => {
   const handleExport = (script: SavedScript) => {
     try {
       const parsedContent = JSON.parse(script.content);
-      const scriptText = `${parsedContent.title}\n\n${parsedContent.hook}\n\n${parsedContent.scenes.map((scene: any, index: number) => 
+      const scriptText = `${parsedContent.title}\n\n${parsedContent.hook}\n\n${parsedContent.scenes.map((scene: ScriptScene, index: number) => 
         `Scene ${index + 1} (${scene.timeStamp}):\n${scene.dialogue}\nAction: ${scene.action}\nVisual: ${scene.visual}\nSound: ${scene.sound}`
       ).join('\n\n')}\n\nHashtags: ${parsedContent.hashtags.map((tag: string) => `#${tag}`).join(' ')}`;
       
@@ -588,7 +604,7 @@ const MyScripts = () => {
                   {/* Scenes */}
                   <div className="space-y-4">
                     <h3 className="text-xl font-semibold">Scene Breakdown:</h3>
-                    {selectedScript.scenes.map((scene: any) => (
+                    {selectedScript.scenes.map((scene: ScriptScene) => (
                       <div key={scene.id} className="border border-border/50 rounded-lg p-4 bg-background/30">
                         <div className="flex items-center gap-2 mb-3">
                           <Badge variant="outline" className="bg-primary/20 text-primary border-primary/30">
