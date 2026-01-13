@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { Resend } from "npm:resend@2.0.0";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { maskEmail, maskSensitiveData } from "../_shared/piiMasking.ts";
 
 const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
 
@@ -31,8 +31,9 @@ const sanitizeInput = (input: string, maxLength: number = 100): string => {
     .trim();
 };
 
-const logStep = (step: string, details?: unknown) => {
-  const detailsStr = details ? ` - ${JSON.stringify(details)}` : '';
+const logStep = (step: string, details?: any) => {
+  const maskedDetails = details ? maskSensitiveData(details) : undefined;
+  const detailsStr = maskedDetails ? ` - ${JSON.stringify(maskedDetails)}` : '';
   console.log(`[REGISTRATION-EMAIL] ${step}${detailsStr}`);
 };
 
@@ -57,6 +58,8 @@ serve(async (req) => {
       );
     }
 
+    logStep("Processing registration", { userEmail: maskEmail(userEmail) });
+
     if (!validateEmail(userEmail)) {
       return new Response(
         JSON.stringify({ error: "Invalid email format" }),
@@ -71,7 +74,7 @@ serve(async (req) => {
     const sanitizedEmail = sanitizeInput(userEmail, 254);
     const sanitizedDisplayName = sanitizeInput(displayName, 50);
 
-    logStep("Processing registration email", { userEmail: sanitizedEmail, displayName: sanitizedDisplayName });
+    logStep("Processing registration email", { userEmail: maskEmail(sanitizedEmail), displayName: sanitizedDisplayName });
 
     // Get owner email from environment variable
     const ownerEmail = Deno.env.get("OWNER_EMAIL");

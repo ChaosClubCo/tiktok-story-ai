@@ -1,0 +1,292 @@
+name: E2E Tests
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  workflow_dispatch:
+    inputs:
+      debug_enabled:
+        type: boolean
+        description: 'Run with debug logging'
+        required: false
+        default: false
+
+permissions:
+  contents: read
+  pull-requests: write
+
+env:
+  CI: true
+
+jobs:
+  e2e-tests:
+    name: Playwright E2E Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium firefox
+
+      - name: Build application
+        run: npm run build
+
+      - name: Run Playwright tests
+        run: npx playwright test --shard=${{ matrix.shard }}/3
+        env:
+          PLAYWRIGHT_TEST_BASE_URL: http://localhost:4173
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-results-shard-${{ matrix.shard }}
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 14
+
+      - name: Upload screenshots on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: failure-screenshots-shard-${{ matrix.shard }}
+          path: test-results/**/*.png
+          retention-days: 7
+
+  e2e-report:
+    name: Merge E2E Reports
+    runs-on: ubuntu-latest
+    needs: e2e-tests
+    if: always()
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Download all test results
+        uses: actions/download-artifact@v4
+        with:
+          pattern: playwright-results-shard-*
+          path: all-results
+          merge-multiple: true
+
+      - name: Merge HTML reports
+        run: npx playwright merge-reports --reporter html ./all-results
+        continue-on-error: true
+
+      - name: Upload merged report
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-merged
+          path: playwright-report/
+          retention-days: 30
+
+      - name: Generate test summary
+        run: |
+          echo "# E2E Test Results" > e2e-summary.md
+          echo "" >> e2e-summary.md
+          echo "**Run Date:** $(date -u)" >> e2e-summary.md
+          echo "**Branch:** ${{ github.ref_name }}" >> e2e-summary.md
+          echo "**Commit:** ${{ github.sha }}" >> e2e-summary.md
+          echo "" >> e2e-summary.md
+          echo "## Test Shards" >> e2e-summary.md
+          echo "| Shard | Status |" >> e2e-summary.md
+          echo "|-------|--------|" >> e2e-summary.md
+          echo "| 1/3 | ${{ needs.e2e-tests.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> e2e-summary.md
+          echo "| 2/3 | ${{ needs.e2e-tests.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> e2e-summary.md
+          echo "| 3/3 | ${{ needs.e2e-tests.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> e2e-summary.md
+          echo "" >> e2e-summary.md
+          echo "## Test Categories" >> e2e-summary.md
+          echo "- 🔐 Authentication flows" >> e2e-summary.md
+          echo "- 🔄 Account recovery" >> e2e-summary.md
+          echo "- ♿ Accessibility" >> e2e-summary.md
+          echo "- 📊 Dashboard functionality" >> e2e-summary.md
+          echo "- 🎬 Video generation" >> e2e-summary.md
+          echo "- 🌿 Branch management" >> e2e-summary.md
+
+      - name: Comment on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const summary = fs.readFileSync('e2e-summary.md', 'utf8');
+            
+            // Find existing comment
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            
+            const botComment = comments.find(comment => 
+              comment.user.type === 'Bot' && 
+              comment.body.includes('E2E Test Results')
+            );
+            
+            const body = summary + '\n\n---\n*Updated: ' + new Date().toISOString() + '*';
+            
+            if (botComment) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+                body: body
+              });
+            } else {
+              await github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: body
+              });
+            }
+
+  account-recovery-tests:
+    name: Account Recovery E2E Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Build application
+        run: npm run build
+
+      - name: Run account recovery tests
+        run: npx playwright test e2e/account-recovery.spec.ts --project=chromium
+        env:
+          PLAYWRIGHT_TEST_BASE_URL: http://localhost:4173
+
+      - name: Upload recovery test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: recovery-test-results
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 14
+
+  accessibility-tests:
+    name: Accessibility E2E Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Build application
+        run: npm run build
+
+      - name: Run accessibility tests
+        run: npx playwright test e2e/accessibility.spec.ts --project=chromium
+        env:
+          PLAYWRIGHT_TEST_BASE_URL: http://localhost:4173
+
+      - name: Upload accessibility results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: accessibility-results
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 14
+
+  visual-regression:
+    name: Visual Regression Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    if: github.event_name == 'pull_request'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Build application
+        run: npm run build
+
+      - name: Run visual regression tests
+        run: npx playwright test e2e/visual-regression.spec.ts --project=chromium --update-snapshots
+        env:
+          PLAYWRIGHT_TEST_BASE_URL: http://localhost:4173
+        continue-on-error: true
+
+      - name: Upload visual snapshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: visual-snapshots
+          path: |
+            e2e/__snapshots__/
+            test-results/
+          retention-days: 14

@@ -1,265 +1,201 @@
-import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import { useAuth } from "@/hooks/useAuth";
-import { Header } from "@/components/Header";
-import ScriptWorkflow from "@/components/ScriptWorkflow";
-import ScriptGenerator from "@/components/ScriptGenerator";
-import { CreatorWellness } from "@/components/CreatorWellness";
-import { ViralTopicFinder } from "@/components/ViralTopicFinder";
-import { PerformanceTracker } from "@/components/PerformanceTracker";
-import { FastValueDelivery } from "@/components/FastValueDelivery";
-import { SocialProofCapture } from "@/components/SocialProofCapture";
-import { VisualCreativeHooks } from "@/components/VisualCreativeHooks";
-import { ChatFeedbackRewards } from "@/components/ChatFeedbackRewards";
-import { AIVideoGeneration } from "@/components/AIVideoGeneration";
-import { AIScriptOptimization } from "@/components/AIScriptOptimization";
-import { VoiceToneConsistency } from "@/components/VoiceToneConsistency";
-import { ContentCalendarIntegration } from "@/components/ContentCalendarIntegration";
-import { MultiPlatformAdaptation } from "@/components/MultiPlatformAdaptation";
-import { CreatorMarketplace } from "@/components/CreatorMarketplace";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Button } from "@/components/ui/button";
-import { Zap, Workflow, TrendingUp, FileText, Heart, Target, Rocket, Users, Palette, MessageCircle, Video, Sparkles, Mic, Calendar, Share2, Store } from "lucide-react";
+import { lazy, Suspense, useState, useMemo } from 'react';
+import { useAuth } from '@/hooks/useAuth';
+import { usePageTitle } from '@/hooks/usePageTitle';
+import { useOnboardingRedirect } from '@/hooks/useOnboardingRedirect';
+import { MainLayout } from '@/components/layout/MainLayout';
+import { LoadingSpinner, AuthRequired, SectionHeader } from '@/components/shared';
+import { QuickActionsGrid, PersonalizedRecommendations } from '@/components/dashboard';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Skeleton } from '@/components/ui/skeleton';
 
-const Dashboard = () => {
+import {
+  Workflow, Zap, TrendingUp, Heart, Target, Rocket, Users,
+  Palette, MessageCircle, Video, Sparkles, Mic, Calendar, Share2, Store, Gauge,
+} from 'lucide-react';
+
+// Lazy loaded components for code splitting
+const ScriptWorkflow = lazy(() => import('@/components/ScriptWorkflow'));
+const ScriptGenerator = lazy(() => import('@/components/ScriptGenerator'));
+const CreatorWellness = lazy(() => import('@/components/CreatorWellness').then(m => ({ default: m.CreatorWellness })));
+const ViralTopicFinder = lazy(() => import('@/components/ViralTopicFinder').then(m => ({ default: m.ViralTopicFinder })));
+const PerformanceTracker = lazy(() => import('@/components/PerformanceTracker').then(m => ({ default: m.PerformanceTracker })));
+const FastValueDelivery = lazy(() => import('@/components/FastValueDelivery').then(m => ({ default: m.FastValueDelivery })));
+const SocialProofCapture = lazy(() => import('@/components/SocialProofCapture').then(m => ({ default: m.SocialProofCapture })));
+const VisualCreativeHooks = lazy(() => import('@/components/VisualCreativeHooks').then(m => ({ default: m.VisualCreativeHooks })));
+const ChatFeedbackRewards = lazy(() => import('@/components/ChatFeedbackRewards').then(m => ({ default: m.ChatFeedbackRewards })));
+const AIVideoGeneration = lazy(() => import('@/components/AIVideoGeneration').then(m => ({ default: m.AIVideoGeneration })));
+const AIScriptOptimization = lazy(() => import('@/components/AIScriptOptimization').then(m => ({ default: m.AIScriptOptimization })));
+const VoiceToneConsistency = lazy(() => import('@/components/VoiceToneConsistency').then(m => ({ default: m.VoiceToneConsistency })));
+const ContentCalendarIntegration = lazy(() => import('@/components/ContentCalendarIntegration').then(m => ({ default: m.ContentCalendarIntegration })));
+const MultiPlatformAdaptation = lazy(() => import('@/components/MultiPlatformAdaptation').then(m => ({ default: m.MultiPlatformAdaptation })));
+const CreatorMarketplace = lazy(() => import('@/components/CreatorMarketplace').then(m => ({ default: m.CreatorMarketplace })));
+const PerformanceDashboard = lazy(() => import('@/components/PerformanceDashboard').then(m => ({ default: m.PerformanceDashboard })));
+
+// Tab configuration - Single source of truth
+const TAB_CONFIG = [
+  { id: 'workflow', label: 'Workflow', icon: Workflow },
+  { id: 'generator', label: 'Generator', icon: Zap },
+  { id: 'topics', label: 'Topics', icon: TrendingUp },
+  { id: 'wellness', label: 'Wellness', icon: Heart },
+  { id: 'performance', label: 'Analytics', icon: Target },
+  { id: 'fast-delivery', label: 'Fast', icon: Rocket },
+  { id: 'social-proof', label: 'Social', icon: Users },
+  { id: 'visual-hooks', label: 'Visual', icon: Palette },
+  { id: 'chat-rewards', label: 'Chat', icon: MessageCircle },
+  { id: 'ai-video', label: 'AI Video', icon: Video },
+  { id: 'optimization', label: 'Optimize', icon: Sparkles },
+  { id: 'voice-tone', label: 'Voice', icon: Mic },
+  { id: 'calendar', label: 'Calendar', icon: Calendar },
+  { id: 'platform', label: 'Platform', icon: Share2 },
+  { id: 'marketplace', label: 'Market', icon: Store },
+  { id: 'vitals', label: 'Vitals', icon: Gauge },
+] as const;
+
+// Tab content loading fallback
+function TabSkeleton() {
+  return (
+    <Card>
+      <CardHeader>
+        <Skeleton className="h-6 w-48" />
+        <Skeleton className="h-4 w-72 mt-2" />
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-4">
+          <Skeleton className="h-32 w-full" />
+          <div className="grid grid-cols-2 gap-4">
+            <Skeleton className="h-20" />
+            <Skeleton className="h-20" />
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// Wrapper component for lazy loaded content
+function LazyTabContent({ children }: { children: React.ReactNode }) {
+  return (
+    <Suspense fallback={<TabSkeleton />}>
+      {children}
+    </Suspense>
+  );
+}
+
+/**
+ * Dashboard - Main script creation dashboard
+ * Features:
+ * - Lazy loaded tab components for performance
+ * - Tabbed interface for various creation tools
+ * - Quick action cards
+ */
+export default function Dashboard() {
   const { user, loading } = useAuth();
-  const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState("workflow");
+  const [activeTab, setActiveTab] = useState('workflow');
 
-  useEffect(() => {
-    if (!loading && !user) {
-      navigate("/auth");
-    }
-  }, [user, loading, navigate]);
+  // Check onboarding status and redirect if not completed
+  useOnboardingRedirect();
+
+  usePageTitle('Dashboard');
+
+  // Memoize tab content mapping with lazy components
+  const tabContent = useMemo(() => ({
+    workflow: (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Workflow className="w-5 h-5" aria-hidden="true" />
+            Professional Script Workflow
+          </CardTitle>
+          <CardDescription>
+            Follow our comprehensive 15-step process to create viral TikTok scripts
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <LazyTabContent>
+            <ScriptWorkflow />
+          </LazyTabContent>
+        </CardContent>
+      </Card>
+    ),
+    generator: (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Zap className="w-5 h-5" aria-hidden="true" />
+            AI-Powered Script Generator
+          </CardTitle>
+          <CardDescription>
+            Generate scripts instantly with advanced AI technology
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <LazyTabContent>
+            <ScriptGenerator />
+          </LazyTabContent>
+        </CardContent>
+      </Card>
+    ),
+    topics: <LazyTabContent><ViralTopicFinder /></LazyTabContent>,
+    wellness: <LazyTabContent><CreatorWellness /></LazyTabContent>,
+    performance: <LazyTabContent><PerformanceTracker /></LazyTabContent>,
+    'fast-delivery': <LazyTabContent><FastValueDelivery /></LazyTabContent>,
+    'social-proof': <LazyTabContent><SocialProofCapture /></LazyTabContent>,
+    'visual-hooks': <LazyTabContent><VisualCreativeHooks /></LazyTabContent>,
+    'chat-rewards': <LazyTabContent><ChatFeedbackRewards /></LazyTabContent>,
+    'ai-video': <LazyTabContent><AIVideoGeneration /></LazyTabContent>,
+    optimization: <LazyTabContent><AIScriptOptimization /></LazyTabContent>,
+    'voice-tone': <LazyTabContent><VoiceToneConsistency /></LazyTabContent>,
+    calendar: <LazyTabContent><ContentCalendarIntegration /></LazyTabContent>,
+    platform: <LazyTabContent><MultiPlatformAdaptation /></LazyTabContent>,
+    marketplace: <LazyTabContent><CreatorMarketplace /></LazyTabContent>,
+    vitals: <LazyTabContent><PerformanceDashboard /></LazyTabContent>,
+  }), []);
 
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center space-y-4">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-          <p className="text-muted-foreground">Loading dashboard...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!user) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center space-y-4">
-          <h2 className="text-2xl font-bold">Please sign in</h2>
-          <Button onClick={() => navigate("/auth")}>
-            Go to Login
-          </Button>
-        </div>
-      </div>
-    );
+    return <LoadingSpinner message="Loading dashboard..." />;
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background to-secondary/20">
-      <Header />
-      
-      <div className="container mx-auto px-4 py-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-            Script Creation Dashboard
-          </h1>
-          <p className="text-muted-foreground mt-2">
-            Create viral TikTok scripts with our advanced workflow and AI-powered tools
-          </p>
-        </div>
+    <AuthRequired user={user} loading={loading}>
+      <MainLayout background="gradient">
+        <div className="container mx-auto px-4 py-8 space-y-8">
+          {/* Header */}
+          <SectionHeader
+            title="Script Creation Dashboard"
+            description="Create viral TikTok scripts with our advanced workflow and AI-powered tools"
+            gradient
+          />
 
-        {/* Quick Actions */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-          <Card className="cursor-pointer hover:shadow-lg transition-shadow" onClick={() => navigate("/analytics")}>
-            <CardContent className="p-4 text-center">
-              <TrendingUp className="w-8 h-8 mx-auto mb-2 text-primary" />
-              <h3 className="font-semibold">Analytics</h3>
-              <p className="text-sm text-muted-foreground">View performance</p>
-            </CardContent>
-          </Card>
-          
-          <Card className="cursor-pointer hover:shadow-lg transition-shadow" onClick={() => navigate("/templates")}>
-            <CardContent className="p-4 text-center">
-              <FileText className="w-8 h-8 mx-auto mb-2 text-primary" />
-              <h3 className="font-semibold">Templates</h3>
-              <p className="text-sm text-muted-foreground">Browse library</p>
-            </CardContent>
-          </Card>
-          
-          <Card className="cursor-pointer hover:shadow-lg transition-shadow" onClick={() => navigate("/my-scripts")}>
-            <CardContent className="p-4 text-center">
-              <Zap className="w-8 h-8 mx-auto mb-2 text-primary" />
-              <h3 className="font-semibold">My Scripts</h3>
-              <p className="text-sm text-muted-foreground">Manage scripts</p>
-            </CardContent>
-          </Card>
-          
-          <Card className="cursor-pointer hover:shadow-lg transition-shadow" onClick={() => setActiveTab("workflow")}>
-            <CardContent className="p-4 text-center">
-              <Workflow className="w-8 h-8 mx-auto mb-2 text-primary" />
-              <h3 className="font-semibold">New Script</h3>
-              <p className="text-sm text-muted-foreground">Start creating</p>
-            </CardContent>
-          </Card>
-        </div>
+          {/* Personalized Recommendations */}
+          <PersonalizedRecommendations onNavigate={setActiveTab} />
 
-        {/* Main Dashboard Content */}
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5 lg:grid-cols-15 gap-1">
-            <TabsTrigger value="workflow" className="flex items-center gap-1 text-xs">
-              <Workflow className="w-3 h-3" />
-              <span className="hidden sm:inline">Workflow</span>
-            </TabsTrigger>
-            <TabsTrigger value="generator" className="flex items-center gap-1 text-xs">
-              <Zap className="w-3 h-3" />
-              <span className="hidden sm:inline">Generator</span>
-            </TabsTrigger>
-            <TabsTrigger value="topics" className="flex items-center gap-1 text-xs">
-              <TrendingUp className="w-3 h-3" />
-              <span className="hidden sm:inline">Topics</span>
-            </TabsTrigger>
-            <TabsTrigger value="wellness" className="flex items-center gap-1 text-xs">
-              <Heart className="w-3 h-3" />
-              <span className="hidden sm:inline">Wellness</span>
-            </TabsTrigger>
-            <TabsTrigger value="performance" className="flex items-center gap-1 text-xs">
-              <Target className="w-3 h-3" />
-              <span className="hidden sm:inline">Analytics</span>
-            </TabsTrigger>
-            <TabsTrigger value="fast-delivery" className="flex items-center gap-1 text-xs">
-              <Rocket className="w-3 h-3" />
-              <span className="hidden sm:inline">Fast</span>
-            </TabsTrigger>
-            <TabsTrigger value="social-proof" className="flex items-center gap-1 text-xs">
-              <Users className="w-3 h-3" />
-              <span className="hidden sm:inline">Social</span>
-            </TabsTrigger>
-            <TabsTrigger value="visual-hooks" className="flex items-center gap-1 text-xs">
-              <Palette className="w-3 h-3" />
-              <span className="hidden sm:inline">Visual</span>
-            </TabsTrigger>
-            <TabsTrigger value="chat-rewards" className="flex items-center gap-1 text-xs">
-              <MessageCircle className="w-3 h-3" />
-              <span className="hidden sm:inline">Chat</span>
-            </TabsTrigger>
-            <TabsTrigger value="ai-video" className="flex items-center gap-1 text-xs">
-              <Video className="w-3 h-3" />
-              <span className="hidden sm:inline">AI Video</span>
-            </TabsTrigger>
-            <TabsTrigger value="optimization" className="flex items-center gap-1 text-xs">
-              <Sparkles className="w-3 h-3" />
-              <span className="hidden sm:inline">Optimize</span>
-            </TabsTrigger>
-            <TabsTrigger value="voice-tone" className="flex items-center gap-1 text-xs">
-              <Mic className="w-3 h-3" />
-              <span className="hidden sm:inline">Voice</span>
-            </TabsTrigger>
-            <TabsTrigger value="calendar" className="flex items-center gap-1 text-xs">
-              <Calendar className="w-3 h-3" />
-              <span className="hidden sm:inline">Calendar</span>
-            </TabsTrigger>
-            <TabsTrigger value="platform" className="flex items-center gap-1 text-xs">
-              <Share2 className="w-3 h-3" />
-              <span className="hidden sm:inline">Platform</span>
-            </TabsTrigger>
-            <TabsTrigger value="marketplace" className="flex items-center gap-1 text-xs">
-              <Store className="w-3 h-3" />
-              <span className="hidden sm:inline">Market</span>
-            </TabsTrigger>
-          </TabsList>
-          
-          <TabsContent value="workflow" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Workflow className="w-5 h-5" />
-                  Professional Script Workflow
-                </CardTitle>
-                <CardDescription>
-                  Follow our comprehensive 15-step process to create viral TikTok scripts
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ScriptWorkflow />
-              </CardContent>
-            </Card>
-          </TabsContent>
-          
-          <TabsContent value="generator" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Zap className="w-5 h-5" />
-                  AI-Powered Script Generator
-                </CardTitle>
-                <CardDescription>
-                  Generate scripts instantly with advanced AI technology
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ScriptGenerator />
-              </CardContent>
-            </Card>
-          </TabsContent>
-          
-          <TabsContent value="topics" className="space-y-6">
-            <ViralTopicFinder />
-          </TabsContent>
-          
-          <TabsContent value="wellness" className="space-y-6">
-            <CreatorWellness />
-          </TabsContent>
-          
-          <TabsContent value="performance" className="space-y-6">
-            <PerformanceTracker />
-          </TabsContent>
-          
-          <TabsContent value="fast-delivery" className="space-y-6">
-            <FastValueDelivery />
-          </TabsContent>
-          
-          <TabsContent value="social-proof" className="space-y-6">
-            <SocialProofCapture />
-          </TabsContent>
-          
-          <TabsContent value="visual-hooks" className="space-y-6">
-            <VisualCreativeHooks />
-          </TabsContent>
-          
-          <TabsContent value="chat-rewards" className="space-y-6">
-            <ChatFeedbackRewards />
-          </TabsContent>
-          
-          <TabsContent value="ai-video" className="space-y-6">
-            <AIVideoGeneration />
-          </TabsContent>
-          
-          <TabsContent value="optimization" className="space-y-6">
-            <AIScriptOptimization />
-          </TabsContent>
-          
-          <TabsContent value="voice-tone" className="space-y-6">
-            <VoiceToneConsistency />
-          </TabsContent>
-          
-          <TabsContent value="calendar" className="space-y-6">
-            <ContentCalendarIntegration />
-          </TabsContent>
-          
-          <TabsContent value="platform" className="space-y-6">
-            <MultiPlatformAdaptation />
-          </TabsContent>
-          
-          <TabsContent value="marketplace" className="space-y-6">
-            <CreatorMarketplace />
-          </TabsContent>
-        </Tabs>
-      </div>
-    </div>
+          {/* Quick Actions */}
+          <QuickActionsGrid onNewScript={() => setActiveTab('workflow')} />
+
+          {/* Main Tabs */}
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+            <TabsList className="grid w-full grid-cols-5 lg:grid-cols-16 gap-1 h-auto p-1">
+              {TAB_CONFIG.map(({ id, label, icon: Icon }) => (
+                <TabsTrigger
+                  key={id}
+                  value={id}
+                  className="flex items-center gap-1 text-xs py-2"
+                >
+                  <Icon className="w-3 h-3" aria-hidden="true" />
+                  <span className="hidden sm:inline">{label}</span>
+                </TabsTrigger>
+              ))}
+            </TabsList>
+
+            {TAB_CONFIG.map(({ id }) => (
+              <TabsContent key={id} value={id} className="space-y-6">
+                {tabContent[id as keyof typeof tabContent]}
+              </TabsContent>
+            ))}
+          </Tabs>
+        </div>
+      </MainLayout>
+    </AuthRequired>
   );
-};
-
-export default Dashboard;
+}
