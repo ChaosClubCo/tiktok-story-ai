@@ -1,6 +1,44 @@
-# MiniDrama AI
+# MiniDrama Script Generator
 
-> AI-Powered Viral Script & Video Generation Platform for TikTok and Short-Form Content
+A powerful AI-powered script generation platform for creating viral short-form video content.
+
+## 🚀 Features
+
+### Core Features
+- **AI Script Generation** - Generate viral scripts with customizable tone, niche, and length
+- **Viral Score Prediction** - Analyze scripts for engagement potential with detailed metrics
+- **Script Version Control** - Branch and merge scripts like code with full history
+- **A/B Testing** - Compare script variants with performance tracking
+- **Series Builder** - Create multi-episode content series
+- **Video Generation** - Generate videos from scripts with AI visuals and audio
+
+### 🔐 Security Features
+- **Login Brute-Force Protection** - Progressive rate limiting with CAPTCHA challenges
+- **Security Email Alerts** - Instant notifications for suspicious activity
+- **Two-Factor Authentication** - TOTP-based 2FA for user and admin accounts
+- **Session Management** - View and revoke active sessions
+- **Login Activity Tracking** - Complete history of authentication attempts
+
+### Admin Dashboard
+- **User Management** - View and manage platform users
+- **Content Moderation** - Review and moderate user-generated content
+- **Analytics Dashboard** - Platform usage statistics and performance metrics
+- **System Health** - Edge function status, database stats, and error monitoring
+- **Security Monitoring** - Audit logs and security event tracking
+
+## 📚 Documentation
+
+- [Architecture Overview](docs/ARCHITECTURE.md)
+- [Security Hardening](docs/SECURITY-HARDENING.md)
+- [Audit Report (Jan 2026)](docs/AUDIT-REPORT-2026-01.md) ✨ NEW
+- [Product Roadmap 2026](docs/ROADMAP-2026.md) ✨ NEW
+- [Login Security](docs/LOGIN-SECURITY.md)
+- [Security Alerts](docs/SECURITY-ALERTS.md)
+- [Video Generation](docs/VIDEO-GENERATION.md)
+- [Branch Management](docs/BRANCH-MANAGEMENT.md)
+- [Deployment Guide](docs/DEPLOYMENT.md)
+
+## Project Info
 
 [![Security](https://img.shields.io/badge/security-production--grade-green)](docs/SECURITY-HARDENING.md)
 [![RLS Coverage](https://img.shields.io/badge/RLS%20coverage-100%25-brightgreen)](docs/RLS-PENETRATION-TEST-REPORT.md)

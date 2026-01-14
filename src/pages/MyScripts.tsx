@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
@@ -13,6 +13,23 @@ import { Header } from "@/components/Header";
 import { ScriptVersionHistory } from "@/components/ScriptVersionHistory";
 import { useNavigate } from "react-router-dom";
 import { useAutoVersion } from "@/hooks/useAutoVersion";
+import { BranchSelector } from "@/components/branching/BranchSelector";
+
+interface ScriptScene {
+  id: number;
+  timeStamp: string;
+  dialogue: string;
+  action: string;
+  visual: string;
+  sound: string;
+}
+
+interface Script {
+  title: string;
+  hook: string;
+  scenes: ScriptScene[];
+  hashtags: string[];
+}
 
 interface SavedScript {
   id: string;
@@ -24,6 +41,7 @@ interface SavedScript {
   topic: string;
   created_at: string;
   current_version?: number;
+  active_branch_id?: string | null;
 }
 
 interface BatchAnalysisResult {
@@ -65,13 +83,13 @@ const MyScripts = () => {
     if (user) {
       fetchScripts();
     }
-  }, [user]);
+  }, [user, fetchScripts]);
 
-  const fetchScripts = async () => {
+  const fetchScripts = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from('scripts')
-        .select('*')
+        .select('id, title, content, niche, length, tone, topic, created_at, current_version, active_branch_id')
         .eq('user_id', user?.id)
         .order('created_at', { ascending: false });
 
@@ -87,7 +105,7 @@ const MyScripts = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user, toast]);
 
   const handleDelete = async (scriptId: string) => {
     try {
@@ -130,7 +148,7 @@ const MyScripts = () => {
   const handleExport = (script: SavedScript) => {
     try {
       const parsedContent = JSON.parse(script.content);
-      const scriptText = `${parsedContent.title}\n\n${parsedContent.hook}\n\n${parsedContent.scenes.map((scene: any, index: number) => 
+      const scriptText = `${parsedContent.title}\n\n${parsedContent.hook}\n\n${parsedContent.scenes.map((scene: ScriptScene, index: number) => 
         `Scene ${index + 1} (${scene.timeStamp}):\n${scene.dialogue}\nAction: ${scene.action}\nVisual: ${scene.visual}\nSound: ${scene.sound}`
       ).join('\n\n')}\n\nHashtags: ${parsedContent.hashtags.map((tag: string) => `#${tag}`).join(' ')}`;
       
@@ -240,6 +258,33 @@ const MyScripts = () => {
       title: "Version Restored",
       description: "Script has been restored to selected version",
     });
+  };
+
+  const handleBranchChange = async (scriptId: string, branchId: string) => {
+    // Refetch the specific script to get updated content from the new branch
+    try {
+      const { data, error } = await supabase
+        .from('scripts')
+        .select('id, title, content, niche, length, tone, topic, created_at, current_version, active_branch_id')
+        .eq('id', scriptId)
+        .single();
+
+      if (error) throw error;
+
+      // Update only the specific script in the state
+      setScripts(prev => prev.map(script => 
+        script.id === scriptId ? data : script
+      ));
+
+      toast({
+        title: "Branch Switched",
+        description: "Script content updated to selected branch",
+      });
+    } catch (error) {
+      console.error('Error refetching script after branch change:', error);
+      // Fallback to full refetch if targeted update fails
+      await fetchScripts();
+    }
   };
 
   const toggleSelectAll = () => {
@@ -500,6 +545,11 @@ const MyScripts = () => {
                     </div>
                     
                     <div className="flex flex-wrap gap-2">
+                      <BranchSelector 
+                        scriptId={script.id} 
+                        currentBranchId={script.active_branch_id || null}
+                        onBranchChange={(branchId) => handleBranchChange(script.id, branchId)}
+                      />
                       <Button variant="outline" size="sm" onClick={() => handleView(script)}>
                         <Eye className="w-4 h-4 mr-2" />View
                       </Button>
@@ -554,7 +604,7 @@ const MyScripts = () => {
                   {/* Scenes */}
                   <div className="space-y-4">
                     <h3 className="text-xl font-semibold">Scene Breakdown:</h3>
-                    {selectedScript.scenes.map((scene: any) => (
+                    {selectedScript.scenes.map((scene: ScriptScene) => (
                       <div key={scene.id} className="border border-border/50 rounded-lg p-4 bg-background/30">
                         <div className="flex items-center gap-2 mb-3">
                           <Badge variant="outline" className="bg-primary/20 text-primary border-primary/30">

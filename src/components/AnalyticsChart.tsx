@@ -18,6 +18,28 @@ interface AnalyticsData {
   performance_score: number;
 }
 
+interface NicheData {
+  niche: string;
+  views: number;
+  likes: number;
+  shares: number;
+  comments: number;
+  count: number;
+  avgEngagement: number;
+}
+
+interface TooltipPayload {
+  name: string;
+  value: number | string;
+  color: string;
+}
+
+interface CustomTooltipProps {
+  active?: boolean;
+  payload?: TooltipPayload[];
+  label?: string;
+}
+
 interface AnalyticsChartProps {
   data: AnalyticsData[];
 }
@@ -81,12 +103,12 @@ const AnalyticsChart = ({ data }: AnalyticsChartProps) => {
       engagement: parseFloat(item.engagement_rate)
     }));
 
-  const CustomTooltip = ({ active, payload, label }: any) => {
+  const CustomTooltip = ({ active, payload, label }: CustomTooltipProps) => {
     if (active && payload && payload.length) {
       return (
         <div className="bg-background border rounded-lg p-3 shadow-lg">
           <p className="font-medium">{label}</p>
-          {payload.map((entry: any, index: number) => (
+          {payload.map((entry: TooltipPayload, index: number) => (
             <p key={index} style={{ color: entry.color }}>
               {entry.name}: {typeof entry.value === 'number' ? entry.value.toLocaleString() : entry.value}
               {entry.name.includes('engagement') ? '%' : ''}

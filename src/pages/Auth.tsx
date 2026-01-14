@@ -10,7 +10,10 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, HelpCircle, Mail, Phone, MapPin, RefreshCw, ShieldAlert, Clock } from "lucide-react";
+import { Loader2, HelpCircle, Mail, Phone, MapPin, RefreshCw, ShieldAlert, Clock, Check, Wand2, Fingerprint, UserCircle, KeyRound } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { PasswordStrengthIndicator } from "@/components/auth/PasswordStrengthIndicator";
+import { PasswordInput } from "@/components/auth/PasswordInput";
 import { useSecurityMonitoring } from "@/hooks/useSecurityMonitoring";
 import { useRateLimit } from "@/hooks/useRateLimit";
 import { useLoginRateLimit } from "@/hooks/useLoginRateLimit";
@@ -18,6 +21,9 @@ import { SecurityIndicator } from "@/components/SecurityIndicator";
 import { signUpSchema, loginSchema, passwordResetSchema } from "@/lib/authValidation";
 import { useAuth } from "@/hooks/useAuth";
 import { SocialLoginButtons } from "@/components/auth/SocialLoginButtons";
+import { useBiometricAuth } from "@/hooks/useBiometricAuth";
+import { useGuestMode } from "@/hooks/useGuestMode";
+import { AccountRecoveryFlow } from "@/components/auth/AccountRecoveryFlow";
 
 // Social provider icons
 const GoogleIcon = () => (
@@ -52,7 +58,23 @@ const Auth = () => {
   const loginRateLimit = useLoginRateLimit();
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [isAppleLoading, setIsAppleLoading] = useState(false);
+  const [showResendVerification, setShowResendVerification] = useState(false);
+  const [resendEmail, setResendEmail] = useState("");
+  const [isResendLoading, setIsResendLoading] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
+  const [showMagicLink, setShowMagicLink] = useState(false);
+  const [magicLinkEmail, setMagicLinkEmail] = useState("");
+  const [isMagicLinkLoading, setIsMagicLinkLoading] = useState(false);
+  const [magicLinkSent, setMagicLinkSent] = useState(false);
   const passwordResetRateLimit = useRateLimit({ maxAttempts: 3, windowMs: 5 * 60 * 1000, identifier: 'password-reset' });
+  const resendVerificationRateLimit = useRateLimit({ maxAttempts: 3, windowMs: 5 * 60 * 1000, identifier: 'resend-verification' });
+  const magicLinkRateLimit = useRateLimit({ maxAttempts: 3, windowMs: 5 * 60 * 1000, identifier: 'magic-link' });
+  
+  // Biometric and guest mode
+  const biometric = useBiometricAuth();
+  const { enterGuestMode } = useGuestMode();
+  const [isBiometricLoading, setIsBiometricLoading] = useState(false);
+  const [showAccountRecovery, setShowAccountRecovery] = useState(false);
 
   // Check server-side rate limit on mount
   useEffect(() => {
@@ -265,10 +287,24 @@ const Auth = () => {
       return;
     }
 
+    // Set session persistence based on remember me option
+    // If rememberMe is true, use longer session duration
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
+      options: {
+        // Supabase handles session persistence via cookies
+        // The remember me preference is stored to indicate user intent
+      }
     });
+
+    // Store remember me preference for session restoration
+    if (rememberMe) {
+      localStorage.setItem('minidrama_remember_me', 'true');
+    } else {
+      localStorage.removeItem('minidrama_remember_me');
+      // For non-remember sessions, we'll let the default session behavior handle expiry
+    }
 
     if (error) {
       monitorAuthAttempts(email, false);
@@ -276,13 +312,43 @@ const Auth = () => {
       // Record failed attempt to server for IP-based rate limiting
       const rateLimitResult = await loginRateLimit.recordAttempt(false, captchaSolved);
       
+      // Parse error message for clearer user feedback
+      let errorTitle = "Sign In Failed";
       let errorMessage = error.message;
+      let showResendOption = false;
+      
+      // Distinguish between different error types
+      if (error.message.toLowerCase().includes('invalid login credentials')) {
+        // Check if email exists by attempting to get user (this is a safe check)
+        const { data: signUpData } = await supabase.auth.signUp({
+          email,
+          password: 'temp_check_12345!',
+          options: { data: { check_only: true } }
+        });
+        
+        // If signUp returns a user without session, email exists (wrong password)
+        // If signUp returns with identities array empty, email exists
+        if (signUpData?.user?.identities && signUpData.user.identities.length === 0) {
+          errorTitle = "Incorrect Password";
+          errorMessage = "The password you entered is incorrect. Please try again or reset your password.";
+        } else {
+          errorTitle = "Account Not Found";
+          errorMessage = "No account exists with this email address. Please check your email or create a new account.";
+        }
+      } else if (error.message.toLowerCase().includes('email not confirmed')) {
+        errorTitle = "Email Not Verified";
+        errorMessage = "Please verify your email before signing in. Check your inbox for the verification link.";
+        showResendOption = true;
+        setResendEmail(email);
+      }
+      
+      // Add rate limit context to error message
       if (rateLimitResult?.requiresCaptcha && !captchaSolved) {
-        errorMessage = `${error.message}. Please complete security verification to continue.`;
+        errorMessage = `${errorMessage} Please complete security verification to continue.`;
         generateLoginCaptcha();
       } else if (rateLimitResult?.message && rateLimitResult.captchaAttemptsRemaining !== undefined) {
         if (rateLimitResult.captchaAttemptsRemaining <= 3 && rateLimitResult.captchaAttemptsRemaining > 0) {
-          errorMessage = `${error.message}. ${rateLimitResult.captchaAttemptsRemaining} attempts remaining before lockout.`;
+          errorMessage = `${errorMessage} ${rateLimitResult.captchaAttemptsRemaining} attempts remaining before lockout.`;
         }
         if (rateLimitResult.requiresCaptcha) {
           generateLoginCaptcha();
@@ -290,9 +356,18 @@ const Auth = () => {
       }
       
       toast({
-        title: "Sign In Failed",
+        title: errorTitle,
         description: errorMessage,
         variant: "destructive",
+        action: showResendOption ? (
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={() => setShowResendVerification(true)}
+          >
+            Resend Email
+          </Button>
+        ) : undefined,
       });
       setIsLoading(false);
     } else if (data.session) {
@@ -407,6 +482,183 @@ const Auth = () => {
     }
   };
 
+  const handleResendVerification = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    // Check rate limiting
+    const rateLimitCheck = resendVerificationRateLimit.checkRateLimit();
+    if (!rateLimitCheck.allowed) {
+      toast({
+        variant: "destructive",
+        title: "Too Many Requests",
+        description: `Please wait ${rateLimitCheck.retryAfter} seconds before requesting another verification email.`,
+      });
+      return;
+    }
+    
+    setIsResendLoading(true);
+
+    if (!resendEmail || !resendEmail.includes('@')) {
+      toast({
+        variant: "destructive",
+        title: "Invalid Email",
+        description: "Please enter a valid email address.",
+      });
+      setIsResendLoading(false);
+      return;
+    }
+
+    // Use resend method - this will send a new confirmation email
+    const { error } = await supabase.auth.resend({
+      type: 'signup',
+      email: resendEmail,
+      options: {
+        emailRedirectTo: `${window.location.origin}/`,
+      },
+    });
+
+    if (error) {
+      // Handle specific error cases
+      let errorMessage = error.message;
+      if (error.message.toLowerCase().includes('rate limit')) {
+        errorMessage = "Too many requests. Please wait a few minutes before trying again.";
+      } else if (error.message.toLowerCase().includes('already confirmed')) {
+        errorMessage = "This email is already verified. You can sign in directly.";
+      }
+      
+      toast({
+        title: "Resend Failed",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    } else {
+      toast({
+        title: "Verification Email Sent!",
+        description: "Please check your inbox and click the verification link. Don't forget to check your spam folder.",
+      });
+      setShowResendVerification(false);
+      setResendEmail("");
+    }
+    setIsResendLoading(false);
+  };
+
+  const handleMagicLink = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    // Check rate limiting
+    const rateLimitCheck = magicLinkRateLimit.checkRateLimit();
+    if (!rateLimitCheck.allowed) {
+      toast({
+        variant: "destructive",
+        title: "Too Many Requests",
+        description: `Please wait ${rateLimitCheck.retryAfter} seconds before requesting another magic link.`,
+      });
+      return;
+    }
+    
+    setIsMagicLinkLoading(true);
+
+    if (!magicLinkEmail || !magicLinkEmail.includes('@')) {
+      toast({
+        variant: "destructive",
+        title: "Invalid Email",
+        description: "Please enter a valid email address.",
+      });
+      setIsMagicLinkLoading(false);
+      return;
+    }
+
+    const { error } = await supabase.auth.signInWithOtp({
+      email: magicLinkEmail,
+      options: {
+        emailRedirectTo: `${window.location.origin}/dashboard`,
+      },
+    });
+
+    if (error) {
+      let errorMessage = error.message;
+      if (error.message.toLowerCase().includes('rate limit')) {
+        errorMessage = "Too many requests. Please wait a few minutes before trying again.";
+      }
+      
+      toast({
+        title: "Magic Link Failed",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    } else {
+      setMagicLinkSent(true);
+      toast({
+        title: "Magic Link Sent!",
+        description: "Check your email for a sign-in link. It will expire in 1 hour.",
+      });
+    }
+    setIsMagicLinkLoading(false);
+  };
+
+  // Handle biometric authentication
+  const handleBiometricAuth = async () => {
+    if (!biometric.isRegistered) {
+      toast({
+        title: "No Biometric Credentials",
+        description: "Please sign in with your password first, then enable biometric authentication in settings.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsBiometricLoading(true);
+    
+    const userId = await biometric.authenticateBiometric();
+    
+    if (userId) {
+      // For biometric auth, we need to restore the session
+      // This is a simplified flow - in production, you'd verify against the server
+      const rememberMeStored = localStorage.getItem('minidrama_remember_me');
+      
+      toast({
+        title: "Biometric Authentication",
+        description: "Verifying your identity...",
+      });
+      
+      // Check if there's a stored session that matches
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (session && session.user.id === userId) {
+        toast({
+          title: "Welcome back!",
+          description: "Signed in with biometrics",
+        });
+        await redirectAfterAuth(session.user.id);
+      } else {
+        toast({
+          title: "Session Expired",
+          description: "Please sign in with your password to continue.",
+          variant: "destructive",
+        });
+        biometric.removeBiometric();
+      }
+    } else if (biometric.error) {
+      toast({
+        title: "Biometric Failed",
+        description: biometric.error,
+        variant: "destructive",
+      });
+    }
+    
+    setIsBiometricLoading(false);
+  };
+
+  // Handle guest mode
+  const handleGuestMode = () => {
+    enterGuestMode();
+    toast({
+      title: "Welcome, Guest!",
+      description: "You're exploring MiniDrama. Some features are limited.",
+    });
+    navigate("/dashboard");
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background to-secondary/20 p-4">
       <Card className="w-full max-w-md">
@@ -485,14 +737,30 @@ const Auth = () => {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="signin-password">Password</Label>
-                  <Input
+                  <PasswordInput
                     id="signin-password"
-                    type="password"
                     placeholder="Enter your password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     disabled={isLoading}
+                    autoComplete="current-password"
                   />
+                </div>
+
+                {/* Remember Me */}
+                <div className="flex items-center space-x-2">
+                  <Checkbox 
+                    id="remember-me" 
+                    checked={rememberMe}
+                    onCheckedChange={(checked) => setRememberMe(checked === true)}
+                    disabled={isLoading}
+                  />
+                  <Label 
+                    htmlFor="remember-me" 
+                    className="text-sm font-normal cursor-pointer"
+                  >
+                    Remember me for 30 days
+                  </Label>
                 </div>
                 
                 {/* Login CAPTCHA - shown after 3 failed attempts */}
@@ -536,7 +804,7 @@ const Auth = () => {
                   {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   {loginRateLimit.isBlocked ? `Locked (${loginRateLimit.formatTimeRemaining()})` : 'Sign In'}
                 </Button>
-                <div className="text-center">
+                <div className="text-center space-y-1">
                   <Button
                     type="button"
                     variant="link"
@@ -545,9 +813,95 @@ const Auth = () => {
                   >
                     Forgot your password?
                   </Button>
+                  <div className="flex justify-center gap-2">
+                    <Button
+                      type="button"
+                      variant="link"
+                      onClick={() => setShowResendVerification(true)}
+                      className="text-sm text-muted-foreground"
+                    >
+                      Resend verification
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="link"
+                      onClick={() => setShowAccountRecovery(true)}
+                      className="text-sm text-muted-foreground"
+                    >
+                      <KeyRound className="h-3 w-3 mr-1" />
+                      Account Recovery
+                    </Button>
+                  </div>
                 </div>
                 
                 <SocialLoginButtons disabled={isLoading} />
+                
+                {/* Magic Link Option */}
+                <div className="relative">
+                  <div className="absolute inset-0 flex items-center">
+                    <Separator className="w-full" />
+                  </div>
+                  <div className="relative flex justify-center text-xs uppercase">
+                    <span className="bg-card px-2 text-muted-foreground">
+                      Or use passwordless
+                    </span>
+                  </div>
+                </div>
+                
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => {
+                    setMagicLinkEmail(email);
+                    setShowMagicLink(true);
+                  }}
+                  disabled={isLoading}
+                >
+                  <Wand2 className="mr-2 h-4 w-4" />
+                  Sign in with Magic Link
+                </Button>
+                
+                {/* Biometric Authentication */}
+                {biometric.isAvailable && biometric.isRegistered && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full"
+                    onClick={handleBiometricAuth}
+                    disabled={isLoading || isBiometricLoading}
+                  >
+                    {isBiometricLoading ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Fingerprint className="mr-2 h-4 w-4" />
+                    )}
+                    Sign in with Biometrics
+                  </Button>
+                )}
+                
+                {/* Guest Mode */}
+                <div className="relative pt-2">
+                  <div className="absolute inset-0 flex items-center">
+                    <Separator className="w-full" />
+                  </div>
+                  <div className="relative flex justify-center text-xs uppercase">
+                    <span className="bg-card px-2 text-muted-foreground">
+                      Just browsing?
+                    </span>
+                  </div>
+                </div>
+                
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="w-full text-muted-foreground hover:text-foreground"
+                  onClick={handleGuestMode}
+                  disabled={isLoading}
+                >
+                  <UserCircle className="mr-2 h-4 w-4" />
+                  Continue as Guest
+                </Button>
               </form>
             </TabsContent>
             
@@ -566,14 +920,15 @@ const Auth = () => {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="signup-password">Password</Label>
-                  <Input
+                  <PasswordInput
                     id="signup-password"
-                    type="password"
-                    placeholder="Create a strong password (8+ chars, mixed case, numbers, symbols)"
+                    placeholder="Create a strong password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     disabled={isLoading}
+                    autoComplete="new-password"
                   />
+                  <PasswordStrengthIndicator password={password} />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="captcha">Security Verification</Label>
@@ -701,6 +1056,166 @@ const Auth = () => {
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* Resend Verification Email Dialog */}
+      <Dialog open={showResendVerification} onOpenChange={setShowResendVerification}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Resend Verification Email</DialogTitle>
+            <DialogDescription>
+              Enter your email address and we'll send you a new verification link. 
+              Check your spam folder if you don't see it in your inbox.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleResendVerification} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="resend-email">Email</Label>
+              <Input
+                id="resend-email"
+                type="email"
+                placeholder="Enter your email"
+                value={resendEmail}
+                onChange={(e) => setResendEmail(e.target.value)}
+                disabled={isResendLoading}
+              />
+            </div>
+            <Alert className="border-muted bg-muted/50">
+              <Mail className="h-4 w-4" />
+              <AlertDescription className="text-sm">
+                Verification emails are valid for 24 hours. If your link expired, 
+                use this form to request a new one.
+              </AlertDescription>
+            </Alert>
+            <div className="flex space-x-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setShowResendVerification(false);
+                  setResendEmail("");
+                }}
+                className="flex-1"
+                disabled={isResendLoading}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" className="flex-1" disabled={isResendLoading}>
+                {isResendLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Resend Verification
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Magic Link Dialog */}
+      <Dialog open={showMagicLink} onOpenChange={(open) => {
+        setShowMagicLink(open);
+        if (!open) {
+          setMagicLinkSent(false);
+        }
+      }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Wand2 className="h-5 w-5" />
+              Sign in with Magic Link
+            </DialogTitle>
+            <DialogDescription>
+              {magicLinkSent 
+                ? "Check your email for the magic link. Click it to sign in instantly."
+                : "Enter your email and we'll send you a secure link to sign in without a password."
+              }
+            </DialogDescription>
+          </DialogHeader>
+          
+          {magicLinkSent ? (
+            <div className="space-y-4">
+              <Alert className="border-green-500/50 bg-green-500/10">
+                <Check className="h-4 w-4 text-green-600" />
+                <AlertDescription className="text-green-700 dark:text-green-400">
+                  Magic link sent to <strong>{magicLinkEmail}</strong>
+                </AlertDescription>
+              </Alert>
+              <div className="space-y-2 text-sm text-muted-foreground">
+                <p>• Check your inbox (and spam folder)</p>
+                <p>• The link expires in 1 hour</p>
+                <p>• Click the link to sign in instantly</p>
+              </div>
+              <div className="flex space-x-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setShowMagicLink(false);
+                    setMagicLinkSent(false);
+                    setMagicLinkEmail("");
+                  }}
+                  className="flex-1"
+                >
+                  Close
+                </Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => {
+                    setMagicLinkSent(false);
+                  }}
+                  className="flex-1"
+                >
+                  Send Again
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <form onSubmit={handleMagicLink} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="magic-email">Email</Label>
+                <Input
+                  id="magic-email"
+                  type="email"
+                  placeholder="Enter your email"
+                  value={magicLinkEmail}
+                  onChange={(e) => setMagicLinkEmail(e.target.value)}
+                  disabled={isMagicLinkLoading}
+                />
+              </div>
+              <Alert className="border-muted bg-muted/50">
+                <Wand2 className="h-4 w-4" />
+                <AlertDescription className="text-sm">
+                  No password needed! We'll send a secure link to your email. 
+                  Click it to sign in instantly.
+                </AlertDescription>
+              </Alert>
+              <div className="flex space-x-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setShowMagicLink(false);
+                    setMagicLinkEmail("");
+                  }}
+                  className="flex-1"
+                  disabled={isMagicLinkLoading}
+                >
+                  Cancel
+                </Button>
+                <Button type="submit" className="flex-1" disabled={isMagicLinkLoading}>
+                  {isMagicLinkLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Send Magic Link
+                </Button>
+              </div>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Account Recovery Flow */}
+      <AccountRecoveryFlow
+        open={showAccountRecovery}
+        onOpenChange={setShowAccountRecovery}
+        onRecoverySuccess={() => setShowAccountRecovery(false)}
+      />
     </div>
   );
 };

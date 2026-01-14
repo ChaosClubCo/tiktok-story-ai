@@ -85,6 +85,8 @@ project-root/
 - Content moderation
 - Security monitoring
 - API key rotation
+- **Analytics Dashboard**: Usage statistics, user metrics, API call charts
+- **System Health**: Edge function status, database stats, uptime tracking
 
 ## Data Flow
 
@@ -157,11 +159,24 @@ Customized Shadcn components with:
 - `video_assets`: Generated media assets
 - `predictions_history`: AI analysis results
 - `ab_tests`: A/B testing experiments
+- `ab_test_variants`: Test variants
+- `ab_test_results`: Test metrics
 
 ### Security Tables
 - `profiles`: User profiles
 - `admin_roles`: Admin access control
 - `admin_audit_log`: Security audit trail
+- `admin_totp`: Admin 2FA secrets
+- `admin_2fa_attempts`: 2FA attempt tracking
+- `login_rate_limits`: IP-based rate limiting for login attempts
+- `security_alerts`: Security event notifications
+- `login_activity`: User login history
+- `user_totp`: User 2FA settings
+- `notification_preferences`: Email preferences
+
+### Recovery Tables (NEW)
+- `account_recovery_options`: Backup email and security questions
+- `recovery_rate_limits`: Rate limiting for recovery attempts
 
 ## Edge Functions
 
@@ -182,12 +197,28 @@ Customized Shadcn components with:
 - `admin-get-content`: Content moderation
 - `verify-admin-access`: Admin verification
 - `rotate-api-key`: Key rotation
+- `log-admin-action`: Admin audit logging
+
+### Security Functions
+- `login-rate-limit`: Progressive rate limiting with CAPTCHA support
+- `send-security-alert`: Security notification emails via Resend
+- `user-2fa`: User two-factor authentication
+- `admin-2fa`: Admin two-factor authentication
+- `get-login-activity`: Login history retrieval
+- `get-security-events`: Security event logs
+- `recovery-rate-limit`: Brute-force protection for recovery
+- `recovery-options`: Manage backup email/security questions
+- `verify-recovery`: Verify recovery attempts
+- `send-backup-verification`: Email verification codes
 
 ### Shared Utilities
 - `_shared/authHelpers.ts`: Authentication
 - `_shared/corsHeaders.ts`: CORS configuration
 - `_shared/errorHandler.ts`: Error handling
 - `_shared/aiClient.ts`: AI integration
+- `_shared/rateLimit.ts`: Rate limiting utilities
+- `_shared/piiMasking.ts`: PII protection in logs
+- `_shared/serviceRoleAudit.ts`: Service role operation logging
 
 ## Security Architecture
 
@@ -207,10 +238,23 @@ Customized Shadcn components with:
 - SQL injection prevention
 - Rate limiting
 
+### Login Security
+- Progressive rate limiting (3/5/10/15 attempt thresholds)
+- CAPTCHA challenges after 3 failed attempts
+- IP-based blocking (30min → 1hr → 24hr escalation)
+- Security alert emails for blocked logins
+
+### Security Alerts
+- Email notifications via Resend API
+- Alert types: login_blocked, 2fa_enabled, 2fa_disabled, password_changed, suspicious_activity
+- User-accessible alert history in Settings
+- Audit logging for compliance
+
 ### Audit Logging
 - Admin actions logged
 - Security events tracked
 - User activity monitoring
+- Login attempt history
 
 ## Performance Optimization
 

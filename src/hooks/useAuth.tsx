@@ -1,4 +1,4 @@
-import { useState, useEffect, createContext, useContext } from "react";
+import { useState, useEffect, useCallback, createContext, useContext } from "react";
 import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -38,7 +38,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [profileLoading, setProfileLoading] = useState(false);
 
-  const checkSubscription = async () => {
+  const checkSubscription = useCallback(async () => {
     if (!session) return;
     
     setSubscriptionLoading(true);
@@ -55,7 +55,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     } finally {
       setSubscriptionLoading(false);
     }
-  };
+  }, [session]);
 
   const checkProfile = async () => {
     if (!user) return;
@@ -94,10 +94,26 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           }, 0);
         }
         
-        // Clear data when user logs out
+        // Clear data and remember me preference when user logs out
         if (!session) {
           setSubscription(null);
           setProfile(null);
+        }
+        
+        // Handle token refresh for remember me sessions
+        if (event === 'TOKEN_REFRESHED' && session) {
+          const rememberMe = localStorage.getItem('minidrama_remember_me');
+          if (!rememberMe) {
+            // For non-remember sessions, check if session is older than 24 hours
+            const sessionCreated = new Date(session.user.last_sign_in_at || session.user.created_at || '');
+            const now = new Date();
+            const hoursSinceSignIn = (now.getTime() - sessionCreated.getTime()) / (1000 * 60 * 60);
+            
+            // If more than 24 hours and not remember me, sign out
+            if (hoursSinceSignIn > 24) {
+              supabase.auth.signOut();
+            }
+          }
         }
       }
     );
@@ -108,8 +124,23 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setUser(session?.user ?? null);
       setLoading(false);
       
-      // Check subscription and profile for existing session
+      // Check remember me preference for existing sessions
       if (session?.user) {
+        const rememberMe = localStorage.getItem('minidrama_remember_me');
+        
+        if (!rememberMe) {
+          // For non-remember sessions, check if session is older than 24 hours
+          const sessionCreated = new Date(session.user.last_sign_in_at || session.user.created_at || '');
+          const now = new Date();
+          const hoursSinceSignIn = (now.getTime() - sessionCreated.getTime()) / (1000 * 60 * 60);
+          
+          // If more than 24 hours and not remember me, sign out
+          if (hoursSinceSignIn > 24) {
+            supabase.auth.signOut();
+            return;
+          }
+        }
+        
         setTimeout(() => {
           checkSubscription();
           checkProfile();
@@ -118,9 +149,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     });
 
     return () => authSubscription.unsubscribe();
-  }, []);
+  }, [checkSubscription]);
 
   const signOut = async () => {
+    // Clear remember me preference on sign out
+    localStorage.removeItem('minidrama_remember_me');
     await supabase.auth.signOut();
   };
 

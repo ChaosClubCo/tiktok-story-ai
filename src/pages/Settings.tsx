@@ -11,6 +11,9 @@ import {
   AccountDeletion,
   TwoFactorAuth,
   LoginActivityHistory,
+  SecurityAlertsHistory,
+  BiometricSettings,
+  AccountRecovery,
 } from '@/components/settings';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { User, Bell, Lock, Link2, ArrowLeft } from 'lucide-react';
@@ -67,6 +70,9 @@ export default function Settings() {
             <TabsContent value="security" className="space-y-6">
               <PasswordChange />
               <TwoFactorAuth />
+              <BiometricSettings />
+              <AccountRecovery />
+              <SecurityAlertsHistory />
               <LoginActivityHistory />
               <SessionManagement />
               <AccountDeletion />

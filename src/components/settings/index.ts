@@ -6,3 +6,6 @@ export { SessionManagement } from './SessionManagement';
 export { AccountDeletion } from './AccountDeletion';
 export { TwoFactorAuth } from './TwoFactorAuth';
 export { LoginActivityHistory } from './LoginActivityHistory';
+export { SecurityAlertsHistory } from './SecurityAlertsHistory';
+export { BiometricSettings } from './BiometricSettings';
+export { AccountRecovery } from './AccountRecovery';

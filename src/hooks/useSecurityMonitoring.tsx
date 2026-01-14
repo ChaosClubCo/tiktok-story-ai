@@ -5,7 +5,7 @@ import { toast } from 'sonner';
 interface SecurityEvent {
   type: 'auth_attempt' | 'rate_limit' | 'suspicious_activity' | 'csrf_attempt' | 'admin_action';
   severity: 'low' | 'medium' | 'high' | 'critical';
-  details: Record<string, any>;
+  details: Record<string, unknown>;
   timestamp: string;
   userAgent?: string;
   ip?: string;
@@ -167,7 +167,7 @@ export const useSecurityMonitoring = (config: Partial<AlertConfig> = {}) => {
     });
   }, [logSecurityEvent]);
 
-  const monitorSuspiciousActivity = useCallback((activity: string, details: Record<string, any>) => {
+  const monitorSuspiciousActivity = useCallback((activity: string, details: Record<string, unknown>) => {
     logSecurityEvent({
       type: 'suspicious_activity',
       severity: 'high',
@@ -201,7 +201,7 @@ export const useSecurityMonitoring = (config: Partial<AlertConfig> = {}) => {
       // Check for suspicious patterns
       if (typeof url === 'string' && url.includes('supabase')) {
         const hasValidOrigin = options?.headers && 
-          (options.headers as any)['x-client-info'];
+          (options.headers as Record<string, string>)['x-client-info'];
         
         if (!hasValidOrigin && options?.method !== 'GET') {
           logSecurityEvent({
