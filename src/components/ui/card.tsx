@@ -4,12 +4,16 @@ import { cn } from "@/lib/utils"
 
 const Card = React.forwardRef<
   HTMLDivElement,
-  React.HTMLAttributes<HTMLDivElement>
->(({ className, ...props }, ref) => (
+  React.HTMLAttributes<HTMLDivElement> & { elevated?: boolean; floating?: boolean }
+>(({ className, elevated, floating, ...props }, ref) => (
   <div
     ref={ref}
     className={cn(
-      "rounded-lg border bg-card text-card-foreground shadow-sm",
+      "rounded-lg bg-card text-card-foreground transition-all duration-300",
+      floating && "shadow-floating bg-card-elevated backdrop-blur-sm border-0",
+      elevated && !floating && "shadow-elevated bg-card-elevated border border-border/50",
+      !elevated && !floating && "shadow-elevated border border-border/30",
+      "hover:shadow-floating hover:bg-card-elevated",
       className
     )}
     {...props}

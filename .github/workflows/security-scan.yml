@@ -1,0 +1,309 @@
+name: Security Scan
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  schedule:
+    # Run security scan daily at 2 AM UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write
+  pull-requests: write
+
+jobs:
+  dependency-audit:
+    name: Dependency Vulnerability Scan
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run npm audit
+        run: |
+          echo "Running npm audit..."
+          npm audit --audit-level=moderate || true
+          npm audit --json > audit-results.json || true
+          
+      - name: Check for critical vulnerabilities
+        run: |
+          CRITICAL=$(jq '.metadata.vulnerabilities.critical' audit-results.json)
+          HIGH=$(jq '.metadata.vulnerabilities.high' audit-results.json)
+          
+          echo "Critical vulnerabilities: $CRITICAL"
+          echo "High vulnerabilities: $HIGH"
+          
+          if [ "$CRITICAL" -gt 0 ]; then
+            echo "❌ CRITICAL vulnerabilities found! Failing build."
+            exit 1
+          fi
+          
+          if [ "$HIGH" -gt 5 ]; then
+            echo "⚠️  More than 5 HIGH vulnerabilities found!"
+            exit 1
+          fi
+
+      - name: Upload audit results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: npm-audit-results
+          path: audit-results.json
+          retention-days: 30
+
+  security-linting:
+    name: Security-Focused Code Analysis
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run ESLint security scan
+        run: |
+          npx eslint . \
+            --ext .ts,.tsx,.js,.jsx \
+            --config .eslintrc.security.json \
+            --format json \
+            --output-file eslint-security-results.json || true
+
+      - name: Check ESLint security results
+        run: |
+          ERROR_COUNT=$(jq '[.[] | .errorCount] | add // 0' eslint-security-results.json)
+          WARNING_COUNT=$(jq '[.[] | .warningCount] | add // 0' eslint-security-results.json)
+          
+          echo "Security errors: $ERROR_COUNT"
+          echo "Security warnings: $WARNING_COUNT"
+          
+          if [ "$ERROR_COUNT" -gt 0 ]; then
+            echo "❌ Security violations found in code!"
+            jq -r '.[] | select(.errorCount > 0) | .filePath' eslint-security-results.json
+            exit 1
+          fi
+
+      - name: Upload ESLint results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eslint-security-results
+          path: eslint-security-results.json
+          retention-days: 30
+
+  secret-scanning:
+    name: Secret Detection
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for better detection
+
+      - name: TruffleHog Secret Scan
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
+          base: ${{ github.event.repository.default_branch }}
+          head: HEAD
+          extra_args: --only-verified
+
+  security-regression-tests:
+    name: Security Regression Tests
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run security regression tests
+        run: node scripts/security-tests.js
+        env:
+          CI: true
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-test-results
+          path: security-test-results.json
+          retention-days: 30
+
+  supabase-security-check:
+    name: Supabase Security Validation
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Validate Supabase configuration
+        run: |
+          echo "Checking Supabase edge function security..."
+          
+          # Check for JWT verification in config.toml
+          if grep -q "verify_jwt = false" supabase/config.toml; then
+            echo "⚠️  Found edge functions with JWT verification disabled:"
+            grep -B1 "verify_jwt = false" supabase/config.toml
+          fi
+          
+          # Check for proper CORS headers
+          echo "Checking CORS configuration..."
+          if ! grep -r "corsHeaders" supabase/functions/ > /dev/null; then
+            echo "⚠️  Some edge functions may be missing CORS headers"
+          fi
+          
+          # Check for PII masking usage
+          echo "Checking PII masking implementation..."
+          if ! grep -r "maskEmail\|maskUserInfo\|truncateUserId" supabase/functions/ > /dev/null; then
+            echo "⚠️  PII masking utilities may not be used consistently"
+          fi
+
+      - name: Check for dangerous patterns
+        run: |
+          echo "Scanning for security anti-patterns..."
+          
+          # Check for dangerouslySetInnerHTML
+          if grep -r "dangerouslySetInnerHTML" src/ 2>/dev/null; then
+            echo "❌ Found dangerouslySetInnerHTML usage!"
+            grep -rn "dangerouslySetInnerHTML" src/
+            exit 1
+          fi
+          
+          # Check for eval usage
+          if grep -r "\beval\(" src/ supabase/functions/ 2>/dev/null; then
+            echo "❌ Found eval() usage!"
+            exit 1
+          fi
+          
+          # Check for raw SQL execution attempts
+          if grep -r "execute.*sql\|raw.*query" supabase/functions/ 2>/dev/null | grep -v "comment"; then
+            echo "⚠️  Potential raw SQL execution detected"
+          fi
+          
+          echo "✅ No dangerous patterns detected"
+
+  dependency-license-check:
+    name: License Compliance Check
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check licenses
+        run: |
+          npx license-checker --summary
+          
+          # Fail on GPL licenses (restrictive)
+          if npx license-checker --onlyAllow 'MIT;Apache-2.0;BSD;ISC;0BSD;BSD-2-Clause;BSD-3-Clause;CC0-1.0;Unlicense' 2>&1 | grep -q 'GPL'; then
+            echo "❌ Restrictive GPL license found!"
+            exit 1
+          fi
+
+  security-report:
+    name: Generate Security Report
+    runs-on: ubuntu-latest
+    needs: [dependency-audit, security-linting, secret-scanning, security-regression-tests, supabase-security-check]
+    if: always()
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: security-reports
+
+      - name: Generate security summary
+        run: |
+          echo "# Security Scan Summary" > security-summary.md
+          echo "" >> security-summary.md
+          echo "**Scan Date:** $(date -u)" >> security-summary.md
+          echo "**Branch:** ${{ github.ref_name }}" >> security-summary.md
+          echo "**Commit:** ${{ github.sha }}" >> security-summary.md
+          echo "" >> security-summary.md
+          
+          echo "## Job Results" >> security-summary.md
+          echo "- Dependency Audit: ${{ needs.dependency-audit.result }}" >> security-summary.md
+          echo "- Security Linting: ${{ needs.security-linting.result }}" >> security-summary.md
+          echo "- Secret Scanning: ${{ needs.secret-scanning.result }}" >> security-summary.md
+          echo "- Regression Tests: ${{ needs.security-regression-tests.result }}" >> security-summary.md
+          echo "- Supabase Check: ${{ needs.supabase-security-check.result }}" >> security-summary.md
+          echo "" >> security-summary.md
+          
+          if [ -f security-reports/npm-audit-results/audit-results.json ]; then
+            echo "## Vulnerability Summary" >> security-summary.md
+            jq -r '.metadata.vulnerabilities | to_entries | .[] | "- \(.key | ascii_upcase): \(.value)"' \
+              security-reports/npm-audit-results/audit-results.json >> security-summary.md 2>/dev/null || echo "N/A" >> security-summary.md
+          fi
+
+      - name: Comment on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const summary = fs.readFileSync('security-summary.md', 'utf8');
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: summary
+            });
+
+      - name: Upload security summary
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-summary
+          path: security-summary.md
+          retention-days: 90

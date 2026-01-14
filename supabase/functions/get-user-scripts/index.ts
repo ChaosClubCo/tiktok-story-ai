@@ -1,12 +1,13 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { truncateUserId } from "../_shared/piiMasking.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const logStep = (step: string, details?: any) => {
+const logStep = (step: string, details?: unknown) => {
   const detailsStr = details ? ` - ${JSON.stringify(details)}` : '';
   console.log(`[GET-USER-SCRIPTS] ${step}${detailsStr}`);
 };
@@ -57,7 +58,7 @@ serve(async (req) => {
         }
       );
     }
-    logStep("User authenticated", { userId: user.id });
+    logStep("User authenticated", { userId: truncateUserId(user.id) });
 
     const url = new URL(req.url);
     const limitParam = url.searchParams.get('limit') || '10';

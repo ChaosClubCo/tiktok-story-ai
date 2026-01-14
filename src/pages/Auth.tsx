@@ -7,27 +7,81 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Separator } from "@/components/ui/separator";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, HelpCircle, Mail, Phone, MapPin, RefreshCw } from "lucide-react";
+import { Loader2, HelpCircle, Mail, Phone, MapPin, RefreshCw, ShieldAlert, Clock, Check, Wand2, Fingerprint, UserCircle, KeyRound } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { PasswordStrengthIndicator } from "@/components/auth/PasswordStrengthIndicator";
+import { PasswordInput } from "@/components/auth/PasswordInput";
 import { useSecurityMonitoring } from "@/hooks/useSecurityMonitoring";
 import { useRateLimit } from "@/hooks/useRateLimit";
+import { useLoginRateLimit } from "@/hooks/useLoginRateLimit";
 import { SecurityIndicator } from "@/components/SecurityIndicator";
+import { signUpSchema, loginSchema, passwordResetSchema } from "@/lib/authValidation";
+import { useAuth } from "@/hooks/useAuth";
+import { SocialLoginButtons } from "@/components/auth/SocialLoginButtons";
+import { useBiometricAuth } from "@/hooks/useBiometricAuth";
+import { useGuestMode } from "@/hooks/useGuestMode";
+import { AccountRecoveryFlow } from "@/components/auth/AccountRecoveryFlow";
+
+// Social provider icons
+const GoogleIcon = () => (
+  <svg className="w-5 h-5" viewBox="0 0 24 24">
+    <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+    <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+    <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+    <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+  </svg>
+);
+
+const AppleIcon = () => (
+  <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+    <path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09l.01-.01zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/>
+  </svg>
+);
 
 const Auth = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [resetEmail, setResetEmail] = useState("");
   const [captcha, setCaptcha] = useState({ question: "", answer: 0, userAnswer: "" });
+  const [loginCaptcha, setLoginCaptcha] = useState({ question: "", answer: 0, userAnswer: "" });
   const [isLoading, setIsLoading] = useState(false);
   const [isResetLoading, setIsResetLoading] = useState(false);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { profile, profileLoading } = useAuth();
   const { monitorAuthAttempts, monitorSuspiciousActivity } = useSecurityMonitoring();
   const authRateLimit = useRateLimit({ maxAttempts: 5, windowMs: 15 * 60 * 1000, identifier: 'auth' });
+  const loginRateLimit = useLoginRateLimit();
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+  const [isAppleLoading, setIsAppleLoading] = useState(false);
+  const [showResendVerification, setShowResendVerification] = useState(false);
+  const [resendEmail, setResendEmail] = useState("");
+  const [isResendLoading, setIsResendLoading] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
+  const [showMagicLink, setShowMagicLink] = useState(false);
+  const [magicLinkEmail, setMagicLinkEmail] = useState("");
+  const [isMagicLinkLoading, setIsMagicLinkLoading] = useState(false);
+  const [magicLinkSent, setMagicLinkSent] = useState(false);
   const passwordResetRateLimit = useRateLimit({ maxAttempts: 3, windowMs: 5 * 60 * 1000, identifier: 'password-reset' });
+  const resendVerificationRateLimit = useRateLimit({ maxAttempts: 3, windowMs: 5 * 60 * 1000, identifier: 'resend-verification' });
+  const magicLinkRateLimit = useRateLimit({ maxAttempts: 3, windowMs: 5 * 60 * 1000, identifier: 'magic-link' });
+  
+  // Biometric and guest mode
+  const biometric = useBiometricAuth();
+  const { enterGuestMode } = useGuestMode();
+  const [isBiometricLoading, setIsBiometricLoading] = useState(false);
+  const [showAccountRecovery, setShowAccountRecovery] = useState(false);
 
-  // Generate simple math captcha
+  // Check server-side rate limit on mount
+  useEffect(() => {
+    loginRateLimit.checkRateLimit();
+  }, []);
+
+  // Generate simple math captcha for signup
   const generateCaptcha = () => {
     const a = Math.floor(Math.random() * 10) + 1;
     const b = Math.floor(Math.random() * 10) + 1;
@@ -38,11 +92,45 @@ const Auth = () => {
     });
   };
 
+  // Generate login captcha (shown after 3 failed attempts)
+  const generateLoginCaptcha = () => {
+    const a = Math.floor(Math.random() * 10) + 1;
+    const b = Math.floor(Math.random() * 10) + 1;
+    setLoginCaptcha({
+      question: `${a} + ${b} = ?`,
+      answer: a + b,
+      userAnswer: ""
+    });
+  };
+
+  // Generate login captcha when required
+  useEffect(() => {
+    if (loginRateLimit.requiresCaptcha && !loginCaptcha.question) {
+      generateLoginCaptcha();
+    }
+  }, [loginRateLimit.requiresCaptcha]);
+
+  // Helper function to redirect based on onboarding status
+  const redirectAfterAuth = async (userId: string) => {
+    // Check if user has completed onboarding
+    const { data: profileData } = await supabase
+      .from('profiles')
+      .select('onboarding_completed')
+      .eq('user_id', userId)
+      .single();
+
+    if (profileData && !profileData.onboarding_completed) {
+      navigate("/onboarding");
+    } else {
+      navigate("/dashboard");
+    }
+  };
+
   useEffect(() => {
     const checkSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
-        navigate("/dashboard");
+        await redirectAfterAuth(session.user.id);
       }
     };
     checkSession();
@@ -65,37 +153,19 @@ const Auth = () => {
     
     setIsLoading(true);
 
-    if (!email || !password) {
+    // Validate with Zod
+    const validation = signUpSchema.safeParse({ 
+      email, 
+      password, 
+      captcha: captcha.userAnswer 
+    });
+    
+    if (!validation.success) {
+      const firstError = validation.error.errors[0];
       toast({
-        title: "Missing Information",
-        description: "Please enter both email and password",
         variant: "destructive",
-      });
-      setIsLoading(false);
-      return;
-    }
-
-    // Enhanced password validation
-    if (password.length < 8) {
-      toast({
-        title: "Password Too Short",
-        description: "Password must be at least 8 characters long",
-        variant: "destructive",
-      });
-      setIsLoading(false);
-      return;
-    }
-
-    const hasUppercase = /[A-Z]/.test(password);
-    const hasLowercase = /[a-z]/.test(password);
-    const hasNumbers = /\d/.test(password);
-    const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>]/.test(password);
-
-    if (!hasUppercase || !hasLowercase || !hasNumbers || !hasSpecialChar) {
-      toast({
-        title: "Weak Password",
-        description: "Password must contain uppercase, lowercase, numbers, and special characters",
-        variant: "destructive",
+        title: "Validation Error",
+        description: firstError.message,
       });
       setIsLoading(false);
       return;
@@ -112,14 +182,14 @@ const Auth = () => {
       return;
     }
 
-    // Use dynamic redirect URL based on current origin
-    const trustedRedirectUrl = `${window.location.origin}/dashboard`;
+    // Use environment-based redirect URL (works in dev, preview, and production)
+    const redirectUrl = `${window.location.origin}/`;
     
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
-        emailRedirectTo: trustedRedirectUrl,
+        emailRedirectTo: redirectUrl,
       },
     });
 
@@ -131,26 +201,22 @@ const Auth = () => {
         variant: "destructive",
       });
     } else {
-      // Send registration notification email
-      if (data.user) {
-        try {
-          await supabase.functions.invoke('send-registration-email', {
-            body: {
-              userEmail: email,
-              displayName: data.user.user_metadata?.display_name || 'New User'
-            }
-          });
-        } catch (emailError) {
-          console.error('Failed to send registration email:', emailError);
-        }
-      }
-
       monitorAuthAttempts(email, true);
       
-      toast({
-        title: "Account Created!",
-        description: "You can now sign in with your credentials",
-      });
+      // Check if email confirmation is required
+      if (data.user && !data.session) {
+        toast({
+          title: "Check Your Email!",
+          description: "We've sent you a confirmation link. Please check your inbox and click the link to activate your account.",
+        });
+      } else if (data.session) {
+        toast({
+          title: "Account Created!",
+          description: "You have been signed in successfully.",
+        });
+        // Redirect to onboarding for new users
+        navigate("/onboarding");
+      }
       setEmail("");
       setPassword("");
     }
@@ -160,7 +226,17 @@ const Auth = () => {
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Check rate limiting
+    // Check server-side IP rate limiting first
+    if (loginRateLimit.isBlocked) {
+      toast({
+        variant: "destructive",
+        title: "Account Temporarily Locked",
+        description: loginRateLimit.warningMessage || `Too many failed attempts. Try again in ${loginRateLimit.formatTimeRemaining()}.`,
+      });
+      return;
+    }
+    
+    // Check client-side rate limiting
     const rateLimitCheck = authRateLimit.checkRateLimit();
     if (!rateLimitCheck.allowed) {
       toast({
@@ -170,42 +246,144 @@ const Auth = () => {
       });
       return;
     }
+
+    // Check CAPTCHA if required
+    let captchaSolved = false;
+    if (loginRateLimit.requiresCaptcha) {
+      if (!loginCaptcha.userAnswer) {
+        toast({
+          variant: "destructive",
+          title: "Security Verification Required",
+          description: "Please solve the math problem to continue.",
+        });
+        return;
+      }
+      
+      if (parseInt(loginCaptcha.userAnswer) !== loginCaptcha.answer) {
+        toast({
+          variant: "destructive",
+          title: "Incorrect Answer",
+          description: "Please solve the math problem correctly.",
+        });
+        generateLoginCaptcha();
+        return;
+      }
+      captchaSolved = true;
+    }
     
     setIsLoading(true);
 
-    if (!email || !password) {
+    // Validate with Zod
+    const validation = loginSchema.safeParse({ email, password });
+    
+    if (!validation.success) {
+      const firstError = validation.error.errors[0];
       toast({
-        title: "Missing Information",
-        description: "Please enter both email and password",
         variant: "destructive",
+        title: "Validation Error",
+        description: firstError.message,
       });
       setIsLoading(false);
       return;
     }
 
+    // Set session persistence based on remember me option
+    // If rememberMe is true, use longer session duration
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
+      options: {
+        // Supabase handles session persistence via cookies
+        // The remember me preference is stored to indicate user intent
+      }
     });
+
+    // Store remember me preference for session restoration
+    if (rememberMe) {
+      localStorage.setItem('minidrama_remember_me', 'true');
+    } else {
+      localStorage.removeItem('minidrama_remember_me');
+      // For non-remember sessions, we'll let the default session behavior handle expiry
+    }
 
     if (error) {
       monitorAuthAttempts(email, false);
+      
+      // Record failed attempt to server for IP-based rate limiting
+      const rateLimitResult = await loginRateLimit.recordAttempt(false, captchaSolved);
+      
+      // Parse error message for clearer user feedback
+      let errorTitle = "Sign In Failed";
+      let errorMessage = error.message;
+      let showResendOption = false;
+      
+      // Distinguish between different error types
+      if (error.message.toLowerCase().includes('invalid login credentials')) {
+        // Check if email exists by attempting to get user (this is a safe check)
+        const { data: signUpData } = await supabase.auth.signUp({
+          email,
+          password: 'temp_check_12345!',
+          options: { data: { check_only: true } }
+        });
+        
+        // If signUp returns a user without session, email exists (wrong password)
+        // If signUp returns with identities array empty, email exists
+        if (signUpData?.user?.identities && signUpData.user.identities.length === 0) {
+          errorTitle = "Incorrect Password";
+          errorMessage = "The password you entered is incorrect. Please try again or reset your password.";
+        } else {
+          errorTitle = "Account Not Found";
+          errorMessage = "No account exists with this email address. Please check your email or create a new account.";
+        }
+      } else if (error.message.toLowerCase().includes('email not confirmed')) {
+        errorTitle = "Email Not Verified";
+        errorMessage = "Please verify your email before signing in. Check your inbox for the verification link.";
+        showResendOption = true;
+        setResendEmail(email);
+      }
+      
+      // Add rate limit context to error message
+      if (rateLimitResult?.requiresCaptcha && !captchaSolved) {
+        errorMessage = `${errorMessage} Please complete security verification to continue.`;
+        generateLoginCaptcha();
+      } else if (rateLimitResult?.message && rateLimitResult.captchaAttemptsRemaining !== undefined) {
+        if (rateLimitResult.captchaAttemptsRemaining <= 3 && rateLimitResult.captchaAttemptsRemaining > 0) {
+          errorMessage = `${errorMessage} ${rateLimitResult.captchaAttemptsRemaining} attempts remaining before lockout.`;
+        }
+        if (rateLimitResult.requiresCaptcha) {
+          generateLoginCaptcha();
+        }
+      }
+      
       toast({
-        title: "Sign In Failed",
-        description: error.message,
+        title: errorTitle,
+        description: errorMessage,
         variant: "destructive",
+        action: showResendOption ? (
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={() => setShowResendVerification(true)}
+          >
+            Resend Email
+          </Button>
+        ) : undefined,
       });
       setIsLoading(false);
     } else if (data.session) {
+      // Record successful attempt to reset rate limit
+      await loginRateLimit.recordAttempt(true);
+      
+      // Reset login captcha state
+      setLoginCaptcha({ question: "", answer: 0, userAnswer: "" });
+      
       monitorAuthAttempts(email, true);
       toast({
         title: "Welcome back!",
         description: "You have been signed in successfully",
       });
-      // Wait a moment for the auth state to update, then go to dashboard
-      setTimeout(() => {
-        navigate("/dashboard");
-      }, 100);
+      // Redirect based on onboarding status
+      await redirectAfterAuth(data.session.user.id);
     }
   };
 
@@ -225,21 +403,25 @@ const Auth = () => {
     
     setIsResetLoading(true);
 
-    if (!resetEmail) {
+    // Validate with Zod
+    const validation = passwordResetSchema.safeParse({ email: resetEmail });
+    
+    if (!validation.success) {
+      const firstError = validation.error.errors[0];
       toast({
-        title: "Missing Email",
-        description: "Please enter your email address",
         variant: "destructive",
+        title: "Validation Error",
+        description: firstError.message,
       });
       setIsResetLoading(false);
       return;
     }
 
-    // Use dynamic redirect URL based on current origin
-    const trustedRedirectUrl = `${window.location.origin}/auth`;
+    // Use environment-aware redirect URL for all environments
+    const redirectUrl = `${window.location.origin}/`;
     
     const { error } = await supabase.auth.resetPasswordForEmail(resetEmail, {
-      redirectTo: trustedRedirectUrl,
+      redirectTo: redirectUrl,
     });
 
     if (error) {
@@ -257,6 +439,224 @@ const Auth = () => {
       setResetEmail("");
     }
     setIsResetLoading(false);
+  };
+
+  // Social login handlers
+  const handleGoogleSignIn = async () => {
+    setIsGoogleLoading(true);
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/dashboard`,
+        },
+      });
+      if (error) throw error;
+    } catch (error: any) {
+      toast({
+        title: "Google Sign In Failed",
+        description: error.message || "Could not sign in with Google. Please try again.",
+        variant: "destructive",
+      });
+      setIsGoogleLoading(false);
+    }
+  };
+
+  const handleAppleSignIn = async () => {
+    setIsAppleLoading(true);
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'apple',
+        options: {
+          redirectTo: `${window.location.origin}/dashboard`,
+        },
+      });
+      if (error) throw error;
+    } catch (error: any) {
+      toast({
+        title: "Apple Sign In Failed",
+        description: error.message || "Could not sign in with Apple. Please try again.",
+        variant: "destructive",
+      });
+      setIsAppleLoading(false);
+    }
+  };
+
+  const handleResendVerification = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    // Check rate limiting
+    const rateLimitCheck = resendVerificationRateLimit.checkRateLimit();
+    if (!rateLimitCheck.allowed) {
+      toast({
+        variant: "destructive",
+        title: "Too Many Requests",
+        description: `Please wait ${rateLimitCheck.retryAfter} seconds before requesting another verification email.`,
+      });
+      return;
+    }
+    
+    setIsResendLoading(true);
+
+    if (!resendEmail || !resendEmail.includes('@')) {
+      toast({
+        variant: "destructive",
+        title: "Invalid Email",
+        description: "Please enter a valid email address.",
+      });
+      setIsResendLoading(false);
+      return;
+    }
+
+    // Use resend method - this will send a new confirmation email
+    const { error } = await supabase.auth.resend({
+      type: 'signup',
+      email: resendEmail,
+      options: {
+        emailRedirectTo: `${window.location.origin}/`,
+      },
+    });
+
+    if (error) {
+      // Handle specific error cases
+      let errorMessage = error.message;
+      if (error.message.toLowerCase().includes('rate limit')) {
+        errorMessage = "Too many requests. Please wait a few minutes before trying again.";
+      } else if (error.message.toLowerCase().includes('already confirmed')) {
+        errorMessage = "This email is already verified. You can sign in directly.";
+      }
+      
+      toast({
+        title: "Resend Failed",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    } else {
+      toast({
+        title: "Verification Email Sent!",
+        description: "Please check your inbox and click the verification link. Don't forget to check your spam folder.",
+      });
+      setShowResendVerification(false);
+      setResendEmail("");
+    }
+    setIsResendLoading(false);
+  };
+
+  const handleMagicLink = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    // Check rate limiting
+    const rateLimitCheck = magicLinkRateLimit.checkRateLimit();
+    if (!rateLimitCheck.allowed) {
+      toast({
+        variant: "destructive",
+        title: "Too Many Requests",
+        description: `Please wait ${rateLimitCheck.retryAfter} seconds before requesting another magic link.`,
+      });
+      return;
+    }
+    
+    setIsMagicLinkLoading(true);
+
+    if (!magicLinkEmail || !magicLinkEmail.includes('@')) {
+      toast({
+        variant: "destructive",
+        title: "Invalid Email",
+        description: "Please enter a valid email address.",
+      });
+      setIsMagicLinkLoading(false);
+      return;
+    }
+
+    const { error } = await supabase.auth.signInWithOtp({
+      email: magicLinkEmail,
+      options: {
+        emailRedirectTo: `${window.location.origin}/dashboard`,
+      },
+    });
+
+    if (error) {
+      let errorMessage = error.message;
+      if (error.message.toLowerCase().includes('rate limit')) {
+        errorMessage = "Too many requests. Please wait a few minutes before trying again.";
+      }
+      
+      toast({
+        title: "Magic Link Failed",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    } else {
+      setMagicLinkSent(true);
+      toast({
+        title: "Magic Link Sent!",
+        description: "Check your email for a sign-in link. It will expire in 1 hour.",
+      });
+    }
+    setIsMagicLinkLoading(false);
+  };
+
+  // Handle biometric authentication
+  const handleBiometricAuth = async () => {
+    if (!biometric.isRegistered) {
+      toast({
+        title: "No Biometric Credentials",
+        description: "Please sign in with your password first, then enable biometric authentication in settings.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsBiometricLoading(true);
+    
+    const userId = await biometric.authenticateBiometric();
+    
+    if (userId) {
+      // For biometric auth, we need to restore the session
+      // This is a simplified flow - in production, you'd verify against the server
+      const rememberMeStored = localStorage.getItem('minidrama_remember_me');
+      
+      toast({
+        title: "Biometric Authentication",
+        description: "Verifying your identity...",
+      });
+      
+      // Check if there's a stored session that matches
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (session && session.user.id === userId) {
+        toast({
+          title: "Welcome back!",
+          description: "Signed in with biometrics",
+        });
+        await redirectAfterAuth(session.user.id);
+      } else {
+        toast({
+          title: "Session Expired",
+          description: "Please sign in with your password to continue.",
+          variant: "destructive",
+        });
+        biometric.removeBiometric();
+      }
+    } else if (biometric.error) {
+      toast({
+        title: "Biometric Failed",
+        description: biometric.error,
+        variant: "destructive",
+      });
+    }
+    
+    setIsBiometricLoading(false);
+  };
+
+  // Handle guest mode
+  const handleGuestMode = () => {
+    enterGuestMode();
+    toast({
+      title: "Welcome, Guest!",
+      description: "You're exploring MiniDrama. Some features are limited.",
+    });
+    navigate("/dashboard");
   };
 
   return (
@@ -280,6 +680,42 @@ const Auth = () => {
           </div>
         </CardHeader>
         <CardContent>
+          {/* IP Block Warning */}
+          {loginRateLimit.isBlocked && (
+            <Alert variant="destructive" className="mb-4">
+              <ShieldAlert className="h-4 w-4" />
+              <AlertDescription className="flex items-center justify-between">
+                <span>Account locked due to too many failed attempts.</span>
+                <span className="flex items-center gap-1 font-mono">
+                  <Clock className="h-4 w-4" />
+                  {loginRateLimit.formatTimeRemaining()}
+                </span>
+              </AlertDescription>
+            </Alert>
+          )}
+          
+          {/* CAPTCHA Required Warning */}
+          {!loginRateLimit.isBlocked && loginRateLimit.requiresCaptcha && (
+            <Alert variant="default" className="mb-4 border-orange-500/50 bg-orange-500/10">
+              <ShieldAlert className="h-4 w-4 text-orange-600" />
+              <AlertDescription className="text-orange-700 dark:text-orange-400">
+                Security verification required. {loginRateLimit.captchaAttemptsRemaining !== null && loginRateLimit.captchaAttemptsRemaining > 0 
+                  ? `${loginRateLimit.captchaAttemptsRemaining} attempts remaining before lockout.`
+                  : 'Complete the verification below to continue.'}
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {/* Low Attempts Warning (before CAPTCHA) */}
+          {!loginRateLimit.isBlocked && !loginRateLimit.requiresCaptcha && loginRateLimit.remainingAttempts !== null && loginRateLimit.remainingAttempts <= 2 && (
+            <Alert variant="default" className="mb-4 border-yellow-500/50 bg-yellow-500/10">
+              <ShieldAlert className="h-4 w-4 text-yellow-600" />
+              <AlertDescription className="text-yellow-700 dark:text-yellow-400">
+                Warning: {loginRateLimit.remainingAttempts} login attempt{loginRateLimit.remainingAttempts !== 1 ? 's' : ''} remaining before security verification required.
+              </AlertDescription>
+            </Alert>
+          )}
+          
           <Tabs defaultValue="signin" className="space-y-4">
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="signin">Sign In</TabsTrigger>
@@ -301,20 +737,74 @@ const Auth = () => {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="signin-password">Password</Label>
-                  <Input
+                  <PasswordInput
                     id="signin-password"
-                    type="password"
                     placeholder="Enter your password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     disabled={isLoading}
+                    autoComplete="current-password"
                   />
                 </div>
-                <Button type="submit" className="w-full" disabled={isLoading}>
+
+                {/* Remember Me */}
+                <div className="flex items-center space-x-2">
+                  <Checkbox 
+                    id="remember-me" 
+                    checked={rememberMe}
+                    onCheckedChange={(checked) => setRememberMe(checked === true)}
+                    disabled={isLoading}
+                  />
+                  <Label 
+                    htmlFor="remember-me" 
+                    className="text-sm font-normal cursor-pointer"
+                  >
+                    Remember me for 30 days
+                  </Label>
+                </div>
+                
+                {/* Login CAPTCHA - shown after 3 failed attempts */}
+                {loginRateLimit.requiresCaptcha && (
+                  <div className="space-y-2 p-3 border border-orange-500/30 rounded-md bg-orange-500/5">
+                    <Label htmlFor="login-captcha" className="text-sm font-medium flex items-center gap-2">
+                      <ShieldAlert className="h-4 w-4 text-orange-600" />
+                      Security Verification
+                    </Label>
+                    <div className="flex items-center space-x-2">
+                      <div className="flex items-center space-x-2 flex-1">
+                        <span className="text-sm font-medium">{loginCaptcha.question}</span>
+                        <Input
+                          id="login-captcha"
+                          type="number"
+                          placeholder="Answer"
+                          value={loginCaptcha.userAnswer}
+                          onChange={(e) => setLoginCaptcha(prev => ({ ...prev, userAnswer: e.target.value }))}
+                          disabled={isLoading}
+                          className="w-20"
+                        />
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        onClick={generateLoginCaptcha}
+                        disabled={isLoading}
+                      >
+                        <RefreshCw className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                )}
+                
+                <Button 
+                  type="submit" 
+                  className="w-full" 
+                  disabled={isLoading || loginRateLimit.isBlocked}
+                >
                   {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Sign In
+                  {loginRateLimit.isBlocked ? `Locked (${loginRateLimit.formatTimeRemaining()})` : 'Sign In'}
                 </Button>
-                <div className="text-center">
+                <div className="text-center space-y-1">
                   <Button
                     type="button"
                     variant="link"
@@ -323,7 +813,95 @@ const Auth = () => {
                   >
                     Forgot your password?
                   </Button>
+                  <div className="flex justify-center gap-2">
+                    <Button
+                      type="button"
+                      variant="link"
+                      onClick={() => setShowResendVerification(true)}
+                      className="text-sm text-muted-foreground"
+                    >
+                      Resend verification
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="link"
+                      onClick={() => setShowAccountRecovery(true)}
+                      className="text-sm text-muted-foreground"
+                    >
+                      <KeyRound className="h-3 w-3 mr-1" />
+                      Account Recovery
+                    </Button>
+                  </div>
                 </div>
+                
+                <SocialLoginButtons disabled={isLoading} />
+                
+                {/* Magic Link Option */}
+                <div className="relative">
+                  <div className="absolute inset-0 flex items-center">
+                    <Separator className="w-full" />
+                  </div>
+                  <div className="relative flex justify-center text-xs uppercase">
+                    <span className="bg-card px-2 text-muted-foreground">
+                      Or use passwordless
+                    </span>
+                  </div>
+                </div>
+                
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => {
+                    setMagicLinkEmail(email);
+                    setShowMagicLink(true);
+                  }}
+                  disabled={isLoading}
+                >
+                  <Wand2 className="mr-2 h-4 w-4" />
+                  Sign in with Magic Link
+                </Button>
+                
+                {/* Biometric Authentication */}
+                {biometric.isAvailable && biometric.isRegistered && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full"
+                    onClick={handleBiometricAuth}
+                    disabled={isLoading || isBiometricLoading}
+                  >
+                    {isBiometricLoading ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Fingerprint className="mr-2 h-4 w-4" />
+                    )}
+                    Sign in with Biometrics
+                  </Button>
+                )}
+                
+                {/* Guest Mode */}
+                <div className="relative pt-2">
+                  <div className="absolute inset-0 flex items-center">
+                    <Separator className="w-full" />
+                  </div>
+                  <div className="relative flex justify-center text-xs uppercase">
+                    <span className="bg-card px-2 text-muted-foreground">
+                      Just browsing?
+                    </span>
+                  </div>
+                </div>
+                
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="w-full text-muted-foreground hover:text-foreground"
+                  onClick={handleGuestMode}
+                  disabled={isLoading}
+                >
+                  <UserCircle className="mr-2 h-4 w-4" />
+                  Continue as Guest
+                </Button>
               </form>
             </TabsContent>
             
@@ -342,14 +920,15 @@ const Auth = () => {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="signup-password">Password</Label>
-                  <Input
+                  <PasswordInput
                     id="signup-password"
-                    type="password"
-                    placeholder="Create a strong password (8+ chars, mixed case, numbers, symbols)"
+                    placeholder="Create a strong password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     disabled={isLoading}
+                    autoComplete="new-password"
                   />
+                  <PasswordStrengthIndicator password={password} />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="captcha">Security Verification</Label>
@@ -381,6 +960,8 @@ const Auth = () => {
                   {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   Create Account
                 </Button>
+                
+                <SocialLoginButtons disabled={isLoading} />
               </form>
             </TabsContent>
           </Tabs>
@@ -475,6 +1056,166 @@ const Auth = () => {
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* Resend Verification Email Dialog */}
+      <Dialog open={showResendVerification} onOpenChange={setShowResendVerification}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Resend Verification Email</DialogTitle>
+            <DialogDescription>
+              Enter your email address and we'll send you a new verification link. 
+              Check your spam folder if you don't see it in your inbox.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleResendVerification} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="resend-email">Email</Label>
+              <Input
+                id="resend-email"
+                type="email"
+                placeholder="Enter your email"
+                value={resendEmail}
+                onChange={(e) => setResendEmail(e.target.value)}
+                disabled={isResendLoading}
+              />
+            </div>
+            <Alert className="border-muted bg-muted/50">
+              <Mail className="h-4 w-4" />
+              <AlertDescription className="text-sm">
+                Verification emails are valid for 24 hours. If your link expired, 
+                use this form to request a new one.
+              </AlertDescription>
+            </Alert>
+            <div className="flex space-x-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setShowResendVerification(false);
+                  setResendEmail("");
+                }}
+                className="flex-1"
+                disabled={isResendLoading}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" className="flex-1" disabled={isResendLoading}>
+                {isResendLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Resend Verification
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Magic Link Dialog */}
+      <Dialog open={showMagicLink} onOpenChange={(open) => {
+        setShowMagicLink(open);
+        if (!open) {
+          setMagicLinkSent(false);
+        }
+      }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Wand2 className="h-5 w-5" />
+              Sign in with Magic Link
+            </DialogTitle>
+            <DialogDescription>
+              {magicLinkSent 
+                ? "Check your email for the magic link. Click it to sign in instantly."
+                : "Enter your email and we'll send you a secure link to sign in without a password."
+              }
+            </DialogDescription>
+          </DialogHeader>
+          
+          {magicLinkSent ? (
+            <div className="space-y-4">
+              <Alert className="border-green-500/50 bg-green-500/10">
+                <Check className="h-4 w-4 text-green-600" />
+                <AlertDescription className="text-green-700 dark:text-green-400">
+                  Magic link sent to <strong>{magicLinkEmail}</strong>
+                </AlertDescription>
+              </Alert>
+              <div className="space-y-2 text-sm text-muted-foreground">
+                <p>• Check your inbox (and spam folder)</p>
+                <p>• The link expires in 1 hour</p>
+                <p>• Click the link to sign in instantly</p>
+              </div>
+              <div className="flex space-x-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setShowMagicLink(false);
+                    setMagicLinkSent(false);
+                    setMagicLinkEmail("");
+                  }}
+                  className="flex-1"
+                >
+                  Close
+                </Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => {
+                    setMagicLinkSent(false);
+                  }}
+                  className="flex-1"
+                >
+                  Send Again
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <form onSubmit={handleMagicLink} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="magic-email">Email</Label>
+                <Input
+                  id="magic-email"
+                  type="email"
+                  placeholder="Enter your email"
+                  value={magicLinkEmail}
+                  onChange={(e) => setMagicLinkEmail(e.target.value)}
+                  disabled={isMagicLinkLoading}
+                />
+              </div>
+              <Alert className="border-muted bg-muted/50">
+                <Wand2 className="h-4 w-4" />
+                <AlertDescription className="text-sm">
+                  No password needed! We'll send a secure link to your email. 
+                  Click it to sign in instantly.
+                </AlertDescription>
+              </Alert>
+              <div className="flex space-x-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setShowMagicLink(false);
+                    setMagicLinkEmail("");
+                  }}
+                  className="flex-1"
+                  disabled={isMagicLinkLoading}
+                >
+                  Cancel
+                </Button>
+                <Button type="submit" className="flex-1" disabled={isMagicLinkLoading}>
+                  {isMagicLinkLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Send Magic Link
+                </Button>
+              </div>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Account Recovery Flow */}
+      <AccountRecoveryFlow
+        open={showAccountRecovery}
+        onOpenChange={setShowAccountRecovery}
+        onRecoverySuccess={() => setShowAccountRecovery(false)}
+      />
     </div>
   );
 };

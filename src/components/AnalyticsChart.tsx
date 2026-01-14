@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { sanitizeChartData, sanitizeText } from '@/lib/sanitization';
 
 interface AnalyticsData {
   id: string;
@@ -17,6 +18,28 @@ interface AnalyticsData {
   performance_score: number;
 }
 
+interface NicheData {
+  niche: string;
+  views: number;
+  likes: number;
+  shares: number;
+  comments: number;
+  count: number;
+  avgEngagement: number;
+}
+
+interface TooltipPayload {
+  name: string;
+  value: number | string;
+  color: string;
+}
+
+interface CustomTooltipProps {
+  active?: boolean;
+  payload?: TooltipPayload[];
+  label?: string;
+}
+
 interface AnalyticsChartProps {
   data: AnalyticsData[];
 }
@@ -25,8 +48,11 @@ const AnalyticsChart = ({ data }: AnalyticsChartProps) => {
   const [chartType, setChartType] = useState("line");
   const [metric, setMetric] = useState("views");
 
+  // Sanitize incoming data
+  const sanitizedData = sanitizeChartData(data, ['title', 'niche'], ['views', 'likes', 'shares', 'comments', 'performance_score']);
+
   // Process data for time series
-  const timeSeriesData = data
+  const timeSeriesData = sanitizedData
     .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
     .map((item, index) => ({
       date: new Date(item.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
@@ -35,11 +61,11 @@ const AnalyticsChart = ({ data }: AnalyticsChartProps) => {
       shares: item.shares,
       comments: item.comments,
       engagement: parseFloat(item.engagement_rate),
-      script: item.title.length > 20 ? item.title.substring(0, 20) + '...' : item.title
+      script: sanitizeText(item.title.length > 20 ? item.title.substring(0, 20) + '...' : item.title)
     }));
 
   // Process data for niche comparison
-  const nicheData = data.reduce((acc: any[], item) => {
+  const nicheData = sanitizedData.reduce((acc: any[], item) => {
     const existingNiche = acc.find(n => n.niche === item.niche);
     if (existingNiche) {
       existingNiche.views += item.views;
@@ -67,22 +93,22 @@ const AnalyticsChart = ({ data }: AnalyticsChartProps) => {
   }));
 
   // Top performing scripts
-  const topScripts = [...data]
+  const topScripts = [...sanitizedData]
     .sort((a, b) => b.performance_score - a.performance_score)
     .slice(0, 5)
     .map(item => ({
-      title: item.title.length > 25 ? item.title.substring(0, 25) + '...' : item.title,
+      title: sanitizeText(item.title.length > 25 ? item.title.substring(0, 25) + '...' : item.title),
       score: item.performance_score,
       views: item.views,
       engagement: parseFloat(item.engagement_rate)
     }));
 
-  const CustomTooltip = ({ active, payload, label }: any) => {
+  const CustomTooltip = ({ active, payload, label }: CustomTooltipProps) => {
     if (active && payload && payload.length) {
       return (
         <div className="bg-background border rounded-lg p-3 shadow-lg">
           <p className="font-medium">{label}</p>
-          {payload.map((entry: any, index: number) => (
+          {payload.map((entry: TooltipPayload, index: number) => (
             <p key={index} style={{ color: entry.color }}>
               {entry.name}: {typeof entry.value === 'number' ? entry.value.toLocaleString() : entry.value}
               {entry.name.includes('engagement') ? '%' : ''}

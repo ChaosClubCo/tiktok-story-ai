@@ -11,45 +11,72 @@ interface SubscriptionTiersProps {
   currentTier?: string;
 }
 
-const tiers = [
+interface Tier {
+  name: string;
+  price: string;
+  description: string;
+  features: string[];
+  popular: boolean;
+  priceId: string | null;
+}
+
+const tiers: Tier[] = [
   {
-    name: "Creator",
-    price: "$9",
-    description: "Perfect for solo creators & hobbyists",
+    name: "Hobbyist",
+    price: "Free",
+    description: "Perfect for getting started",
     features: [
-      "Unlimited MiniDrama generation (fair use)",
+      "5 scripts per month",
+      "Single-episode generation",
       "Basic templates",
-      "720p exports",
-      "Watermarked content"
+      "Community support"
     ],
-    popular: false
+    popular: false,
+    priceId: null
   },
   {
-    name: "Pro",
+    name: "Creator",
     price: "$19",
-    description: "Ideal for ambitious creators",
+    description: "Build your content library",
     features: [
-      "HD/1080p exports",
-      "Access to trending templates",
-      "No watermark",
-      "Scheduling tools",
-      "Social integrations (TikTok, Instagram)"
+      "Unlimited scripts",
+      "Series generation (up to 5 episodes)",
+      "Trend radar access",
+      "Basic visual generation",
+      "Priority support"
     ],
-    popular: true
+    popular: true,
+    priceId: "creator"
+  },
+  {
+    name: "Empire Builder",
+    price: "$49",
+    description: "Scale your content empire",
+    features: [
+      "Everything in Creator",
+      "10-episode series",
+      "Team collaboration (up to 5 members)",
+      "Virality predictions",
+      "Priority AI (faster generation)",
+      "Custom POV templates"
+    ],
+    popular: false,
+    priceId: "empire"
   },
   {
     name: "Studio",
-    price: "$49",
-    description: "Perfect for teams & agencies",
+    price: "$199",
+    description: "Enterprise-grade content production",
     features: [
-      "Team seats",
-      "Collaboration workspace",
-      "Batch generation",
-      "Brand kit upload",
-      "Analytics dashboard",
-      "Export to reels & vertical shorts"
+      "Everything in Empire Builder",
+      "Unlimited team members",
+      "White-label exports",
+      "API access",
+      "Dedicated account manager",
+      "Custom AI training on your style"
     ],
-    popular: false
+    popular: false,
+    priceId: "studio"
   }
 ];
 
@@ -84,10 +111,10 @@ export const SubscriptionTiers = ({ currentTier }: SubscriptionTiersProps) => {
       setTimeout(() => {
         checkSubscription();
       }, 3000);
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: "Error",
-        description: error.message || "Failed to create checkout session",
+        description: error instanceof Error ? error.message : "Failed to create checkout session",
         variant: "destructive",
       });
     } finally {
@@ -108,10 +135,10 @@ export const SubscriptionTiers = ({ currentTier }: SubscriptionTiersProps) => {
 
       // Open customer portal in a new tab
       window.open(data.url, '_blank');
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: "Error",
-        description: error.message || "Failed to open customer portal",
+        description: error instanceof Error ? error.message : "Failed to open customer portal",
         variant: "destructive",
       });
     } finally {
@@ -122,13 +149,15 @@ export const SubscriptionTiers = ({ currentTier }: SubscriptionTiersProps) => {
   return (
     <div className="py-12">
       <div className="text-center mb-12">
-        <h2 className="text-3xl font-bold mb-4">Choose Your Plan</h2>
-        <p className="text-muted-foreground max-w-2xl mx-auto">
-          Select the perfect plan for your creative needs. Upgrade or downgrade anytime.
+        <h2 className="text-3xl sm:text-4xl font-bold mb-4 bg-gradient-drama bg-clip-text text-transparent">
+          Choose Your Growth Path
+        </h2>
+        <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
+          From hobbyist to empire builder. Scale at your own pace.
         </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-7xl mx-auto">
         {tiers.map((tier) => {
           const isCurrentTier = currentTier === tier.name;
           const isSubscribed = subscription?.subscribed && isCurrentTier;
@@ -177,15 +206,23 @@ export const SubscriptionTiers = ({ currentTier }: SubscriptionTiersProps) => {
                     {loading === "manage" && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                     Manage Subscription
                   </Button>
+                ) : tier.priceId === null ? (
+                  <Button 
+                    disabled
+                    className="w-full"
+                    variant="outline"
+                  >
+                    Current Plan
+                  </Button>
                 ) : (
                   <Button 
-                    onClick={() => handleSubscribe(tier.name)}
+                    onClick={() => handleSubscribe(tier.priceId!)}
                     disabled={loading === tier.name}
                     className="w-full"
                     variant={tier.popular ? "default" : "outline"}
                   >
                     {loading === tier.name && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    Subscribe to {tier.name}
+                    Upgrade to {tier.name}
                   </Button>
                 )}
               </CardContent>
