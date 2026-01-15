@@ -382,38 +382,40 @@ To connect a custom domain:
 
 ## Contributing
 
-### Development Workflow
+We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for detailed information on:
 
-1. Create feature branch from `main`
-2. Implement changes with tests
-3. Ensure security scan passes
-4. Submit PR for review
-5. Merge after approval
+- Code standards and style guidelines
+- Development workflow and branching strategy
+- Testing requirements
+- Pull request process
+- Issue reporting guidelines
 
-### Code Standards
+### Quick Start for Contributors
 
-- TypeScript strict mode
-- ESLint security rules
-- Component files < 150 lines
-- Pure functions for business logic
-- Shared utilities for common patterns
+```bash
+# Clone and install
+git clone <repository-url>
+cd tiktok-story-ai
+npm install
 
-### Commit Convention
+# Create feature branch
+git checkout -b feature/your-feature
 
+# Make changes, then test
+npm run test
+npm run lint
+
+# Commit with conventional commits
+git commit -m "feat(scope): add new feature"
 ```
-type(scope): description
 
-feat(scripts): add batch analysis feature
-fix(auth): resolve token refresh issue
-docs(readme): update installation steps
-```
-
----
+See [CONTRIBUTING.md](CONTRIBUTING.md) for full details.
 
 ## Documentation
 
 | Document | Description |
 |----------|-------------|
+| [CONTRIBUTING.md](CONTRIBUTING.md) | Contribution guidelines |
 | [CLAUDE.md](CLAUDE.md) | AI assistant context |
 | [AGENTS.md](AGENTS.md) | Multi-agent documentation |
 | [GEMINI.md](GEMINI.md) | Gemini AI integration |
@@ -423,6 +425,8 @@ docs(readme): update installation steps
 | [docs/SECURITY-HARDENING.md](docs/SECURITY-HARDENING.md) | Security measures |
 | [docs/AI-INTEGRATION.md](docs/AI-INTEGRATION.md) | AI service integration |
 | [docs/VIDEO-GENERATION.md](docs/VIDEO-GENERATION.md) | Video pipeline |
+| [docs/AUDIT-REPORT-2026-01.md](docs/AUDIT-REPORT-2026-01.md) | Latest audit report |
+| [docs/ROADMAP-2026.md](docs/ROADMAP-2026.md) | 2026 Product roadmap |
 
 ---
 

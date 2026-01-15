@@ -38,7 +38,7 @@ export const useSecurityMonitoring = (config: Partial<AlertConfig> = {}) => {
         title: event.details.success ? '🔓 Login Successful' : '🚨 Failed Login Attempt',
         getDescription: (e) => e.details.success 
           ? 'You have been authenticated successfully.'
-          : `Failed login attempt detected. ${e.details.consecutiveFailures > 3 ? 'Multiple failures detected!' : ''}`
+          : `Failed login attempt detected. ${(e.details.consecutiveFailures as number) > 3 ? 'Multiple failures detected!' : ''}`
       },
       rate_limit: {
         title: '⚠️ Rate Limit Exceeded',

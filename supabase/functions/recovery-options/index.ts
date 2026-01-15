@@ -1,8 +1,36 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
-import { Resend } from "npm:resend@2.0.0";
 
-const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
+interface ResendEmailOptions {
+  from: string;
+  to: string[];
+  subject: string;
+  html: string;
+}
+
+const sendEmail = async (options: ResendEmailOptions) => {
+  const resendApiKey = Deno.env.get("RESEND_API_KEY");
+  if (!resendApiKey) {
+    console.warn("[Recovery Options] RESEND_API_KEY not configured, skipping email");
+    return;
+  }
+  
+  const response = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${resendApiKey}`,
+    },
+    body: JSON.stringify(options),
+  });
+  
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`Resend API error: ${error}`);
+  }
+  
+  return response.json();
+};
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -156,7 +184,7 @@ const sendRecoveryChangeNotification = async (
   };
 
   try {
-    await resend.emails.send({
+    await sendEmail({
       from: "MiniDrama Security <noreply@resend.dev>",
       to: [email],
       subject: subjects[changeType],

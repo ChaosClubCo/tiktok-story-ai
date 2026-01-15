@@ -79,12 +79,6 @@ const MyScripts = () => {
     } : null
   );
 
-  useEffect(() => {
-    if (user) {
-      fetchScripts();
-    }
-  }, [user, fetchScripts]);
-
   const fetchScripts = useCallback(async () => {
     try {
       const { data, error } = await supabase
@@ -106,6 +100,12 @@ const MyScripts = () => {
       setLoading(false);
     }
   }, [user, toast]);
+
+  useEffect(() => {
+    if (user) {
+      fetchScripts();
+    }
+  }, [user, fetchScripts]);
 
   const handleDelete = async (scriptId: string) => {
     try {
