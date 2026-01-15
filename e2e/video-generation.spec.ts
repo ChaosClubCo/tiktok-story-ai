@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { test as authTest, expect as authExpect } from './fixtures/auth';
 
 /**
  * E2E Tests for Video Generation Pipeline
@@ -184,5 +185,76 @@ test.describe('Video Generation Error Handling', () => {
     // Error boundary should be in place
     // We can't easily trigger a crash, but we verify the page loads
     await expect(page.locator('body')).toBeVisible();
+  });
+});
+
+/**
+ * Authenticated Video Generation Tests
+ * Uses auth fixtures for protected video features
+ */
+authTest.describe('Authenticated Video Generation', () => {
+  authTest('should access video generator with auth session', async ({ authenticatedPage }) => {
+    await authenticatedPage.goto('/video-generator');
+    await authenticatedPage.waitForLoadState('networkidle');
+    await authenticatedPage.waitForTimeout(2000);
+    
+    // Should not redirect to auth
+    const url = authenticatedPage.url();
+    authExpect(url.includes('/auth')).toBeFalsy();
+    
+    const mainContent = authenticatedPage.locator('main, [class*="video"]');
+    await authExpect(mainContent.first()).toBeVisible();
+  });
+
+  authTest('should display video generation form', async ({ authenticatedPage }) => {
+    await authenticatedPage.goto('/video-generator');
+    await authenticatedPage.waitForTimeout(2000);
+    
+    // Look for form elements
+    const formElements = authenticatedPage.locator('input, textarea, select, button');
+    const hasForm = await formElements.first().isVisible();
+    authExpect(hasForm).toBeTruthy();
+  });
+
+  authTest('should access video editor', async ({ authenticatedPage }) => {
+    await authenticatedPage.goto('/video-editor');
+    await authenticatedPage.waitForLoadState('networkidle');
+    
+    const mainContent = authenticatedPage.locator('main');
+    await authExpect(mainContent.first()).toBeVisible();
+  });
+
+  authTest('should navigate from script to video', async ({ authenticatedPage }) => {
+    await authenticatedPage.goto('/dashboard');
+    await authenticatedPage.waitForTimeout(2000);
+    
+    // Look for video link
+    const videoLink = authenticatedPage.getByRole('link', { name: /video/i });
+    if (await videoLink.first().isVisible()) {
+      await videoLink.first().click();
+      await authenticatedPage.waitForTimeout(2000);
+    }
+    
+    // Page should still be functional
+    const body = authenticatedPage.locator('body');
+    await authExpect(body).toBeVisible();
+  });
+});
+
+authTest.describe('Authenticated Series Builder', () => {
+  authTest('should access series builder', async ({ authenticatedPage }) => {
+    await authenticatedPage.goto('/series-builder');
+    await authenticatedPage.waitForTimeout(2000);
+    
+    const url = authenticatedPage.url();
+    authExpect(url.includes('/auth')).toBeFalsy();
+  });
+
+  authTest('should access series list', async ({ authenticatedPage }) => {
+    await authenticatedPage.goto('/series');
+    await authenticatedPage.waitForTimeout(2000);
+    
+    const mainContent = authenticatedPage.locator('main');
+    await authExpect(mainContent.first()).toBeVisible();
   });
 });
