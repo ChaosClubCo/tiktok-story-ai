@@ -33,7 +33,7 @@ const Analytics = () => {
     if (!loading && !user) {
       navigate("/auth");
     }
-  }, [user, loading, navigate, fetchScripts]);
+  }, [user, loading, navigate]);
 
   const { 
     scripts, 
