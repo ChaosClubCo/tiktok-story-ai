@@ -7,6 +7,7 @@ import { defineConfig, devices } from '@playwright/test';
  * - Run all tests: npx playwright test
  * - Run with UI: npx playwright test --ui
  * - Run specific test: npx playwright test e2e/auth.spec.ts
+ * - Run authenticated tests: npx playwright test e2e/authenticated-flows.spec.ts
  * - Update snapshots: npx playwright test --update-snapshots
  * - Generate report: npx playwright show-report
  * 
@@ -26,6 +27,9 @@ export default defineConfig({
   
   /* Opt out of parallel tests on CI */
   workers: process.env.CI ? 1 : undefined,
+  
+  /* Global timeout for each test */
+  timeout: 30000,
   
   /* Reporter configuration with HTML report and coverage */
   reporter: [
@@ -47,6 +51,12 @@ export default defineConfig({
     
     /* Video recording */
     video: 'on-first-retry',
+    
+    /* Default action timeout */
+    actionTimeout: 10000,
+    
+    /* Default navigation timeout */
+    navigationTimeout: 15000,
   },
 
   /* Visual comparison options */
@@ -58,6 +68,8 @@ export default defineConfig({
     toMatchSnapshot: {
       maxDiffPixelRatio: 0.02,
     },
+    /* Increase expect timeout for slower operations */
+    timeout: 10000,
   },
 
   /* Snapshot output directory */
@@ -65,18 +77,30 @@ export default defineConfig({
 
   /* Configure projects for major browsers */
   projects: [
+    // Setup project for auth state
+    {
+      name: 'setup',
+      testMatch: /.*\.setup\.ts/,
+    },
+    
+    // Chrome with authenticated state
     {
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
     },
+    
+    // Firefox
     {
       name: 'firefox',
       use: { ...devices['Desktop Firefox'] },
     },
+    
+    // Safari
     {
       name: 'webkit',
       use: { ...devices['Desktop Safari'] },
     },
+    
     /* Test against mobile viewports */
     {
       name: 'Mobile Chrome',
@@ -85,6 +109,15 @@ export default defineConfig({
     {
       name: 'Mobile Safari',
       use: { ...devices['iPhone 12'] },
+    },
+    
+    /* Authenticated tests project */
+    {
+      name: 'authenticated',
+      use: { 
+        ...devices['Desktop Chrome'],
+      },
+      testMatch: /.*authenticated.*\.spec\.ts/,
     },
   ],
 
