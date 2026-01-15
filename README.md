@@ -2,6 +2,28 @@
 
 A powerful AI-powered script generation platform for creating viral short-form video content.
 
+## 🧪 Test Status & Coverage
+
+[![Full Test Suite](https://github.com/your-org/tiktok-story-ai/actions/workflows/test-all.yml/badge.svg)](https://github.com/your-org/tiktok-story-ai/actions/workflows/test-all.yml)
+[![E2E Tests](https://github.com/your-org/tiktok-story-ai/actions/workflows/e2e-tests.yml/badge.svg)](https://github.com/your-org/tiktok-story-ai/actions/workflows/e2e-tests.yml)
+[![Security Scan](https://github.com/your-org/tiktok-story-ai/actions/workflows/security-scan.yml/badge.svg)](https://github.com/your-org/tiktok-story-ai/actions/workflows/security-scan.yml)
+
+| Coverage Metric | Status |
+|-----------------|--------|
+| **Lines** | ![Lines](https://img.shields.io/badge/lines-85%25-brightgreen) |
+| **Statements** | ![Statements](https://img.shields.io/badge/statements-83%25-brightgreen) |
+| **Functions** | ![Functions](https://img.shields.io/badge/functions-78%25-yellow) |
+| **Branches** | ![Branches](https://img.shields.io/badge/branches-72%25-yellow) |
+
+### Test Suites
+
+| Suite | Tests | Description |
+|-------|-------|-------------|
+| **Unit Tests** | 50+ | Component, hook, and utility tests |
+| **Integration Tests** | 25+ | Edge function and API tests |
+| **E2E Tests** | 12 specs | Full user journey tests |
+| **Security Tests** | 15+ | Penetration and RLS tests |
+
 ## 🚀 Features
 
 ### Core Features

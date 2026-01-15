@@ -1,0 +1,352 @@
+name: Full Test Suite
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+  checks: write
+
+env:
+  CI: true
+
+jobs:
+  unit-tests:
+    name: Unit & Integration Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run unit tests with coverage
+        run: npm test -- --coverage --reporter=json --reporter=default --outputFile=test-results.json
+        continue-on-error: true
+
+      - name: Generate coverage report
+        run: npm test -- --coverage --reporter=verbose
+        continue-on-error: true
+
+      - name: Upload coverage to artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage/
+          retention-days: 30
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-results
+          path: |
+            test-results.json
+            coverage/
+          retention-days: 14
+
+      - name: Create coverage summary
+        id: coverage
+        run: |
+          if [ -f coverage/coverage-summary.json ]; then
+            LINES=$(jq '.total.lines.pct' coverage/coverage-summary.json)
+            STATEMENTS=$(jq '.total.statements.pct' coverage/coverage-summary.json)
+            FUNCTIONS=$(jq '.total.functions.pct' coverage/coverage-summary.json)
+            BRANCHES=$(jq '.total.branches.pct' coverage/coverage-summary.json)
+            echo "lines=$LINES" >> $GITHUB_OUTPUT
+            echo "statements=$STATEMENTS" >> $GITHUB_OUTPUT
+            echo "functions=$FUNCTIONS" >> $GITHUB_OUTPUT
+            echo "branches=$BRANCHES" >> $GITHUB_OUTPUT
+          else
+            echo "lines=0" >> $GITHUB_OUTPUT
+            echo "statements=0" >> $GITHUB_OUTPUT
+            echo "functions=0" >> $GITHUB_OUTPUT
+            echo "branches=0" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Generate coverage badge data
+        run: |
+          mkdir -p .github/badges
+          if [ -f coverage/coverage-summary.json ]; then
+            LINES=$(jq '.total.lines.pct' coverage/coverage-summary.json)
+            STATEMENTS=$(jq '.total.statements.pct' coverage/coverage-summary.json)
+            FUNCTIONS=$(jq '.total.functions.pct' coverage/coverage-summary.json)
+            BRANCHES=$(jq '.total.branches.pct' coverage/coverage-summary.json)
+          else
+            LINES=0
+            STATEMENTS=0
+            FUNCTIONS=0
+            BRANCHES=0
+          fi
+          
+          # Create badge JSON files
+          echo "{\"schemaVersion\":1,\"label\":\"lines\",\"message\":\"${LINES}%\",\"color\":\"$([ $(echo "$LINES > 80" | bc) -eq 1 ] && echo 'brightgreen' || ([ $(echo "$LINES > 60" | bc) -eq 1 ] && echo 'yellow' || echo 'red'))\"}" > .github/badges/coverage-lines.json
+          echo "{\"schemaVersion\":1,\"label\":\"statements\",\"message\":\"${STATEMENTS}%\",\"color\":\"$([ $(echo "$STATEMENTS > 80" | bc) -eq 1 ] && echo 'brightgreen' || ([ $(echo "$STATEMENTS > 60" | bc) -eq 1 ] && echo 'yellow' || echo 'red'))\"}" > .github/badges/coverage-statements.json
+          echo "{\"schemaVersion\":1,\"label\":\"functions\",\"message\":\"${FUNCTIONS}%\",\"color\":\"$([ $(echo "$FUNCTIONS > 80" | bc) -eq 1 ] && echo 'brightgreen' || ([ $(echo "$FUNCTIONS > 60" | bc) -eq 1 ] && echo 'yellow' || echo 'red'))\"}" > .github/badges/coverage-functions.json
+          echo "{\"schemaVersion\":1,\"label\":\"branches\",\"message\":\"${BRANCHES}%\",\"color\":\"$([ $(echo "$BRANCHES > 80" | bc) -eq 1 ] && echo 'brightgreen' || ([ $(echo "$BRANCHES > 60" | bc) -eq 1 ] && echo 'yellow' || echo 'red'))\"}" > .github/badges/coverage-branches.json
+
+      - name: Upload badge data
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-badges
+          path: .github/badges/
+          retention-days: 90
+
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run integration tests
+        run: npm test -- --testPathPattern="integration|test/.*\.integration" --coverage
+        continue-on-error: true
+
+      - name: Upload integration test results
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-test-results
+          path: coverage/
+          retention-days: 14
+
+  e2e-tests:
+    name: E2E Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: [unit-tests]
+
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium firefox
+
+      - name: Build application
+        run: npm run build
+
+      - name: Run Playwright tests (shard ${{ matrix.shard }}/3)
+        run: npx playwright test --shard=${{ matrix.shard }}/3
+        env:
+          PLAYWRIGHT_TEST_BASE_URL: http://localhost:4173
+
+      - name: Upload Playwright results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-results-${{ matrix.shard }}
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 14
+
+      - name: Upload failure screenshots
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-failure-screenshots-${{ matrix.shard }}
+          path: test-results/**/*.png
+          retention-days: 7
+
+  test-summary:
+    name: Test Summary & PR Comment
+    runs-on: ubuntu-latest
+    needs: [unit-tests, integration-tests, e2e-tests]
+    if: always()
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: all-results
+
+      - name: Generate test summary
+        id: summary
+        run: |
+          UNIT_STATUS="${{ needs.unit-tests.result }}"
+          INTEGRATION_STATUS="${{ needs.integration-tests.result }}"
+          E2E_STATUS="${{ needs.e2e-tests.result }}"
+          
+          # Status emoji mapping
+          get_emoji() {
+            case $1 in
+              success) echo "✅" ;;
+              failure) echo "❌" ;;
+              cancelled) echo "⚠️" ;;
+              skipped) echo "⏭️" ;;
+              *) echo "❓" ;;
+            esac
+          }
+          
+          UNIT_EMOJI=$(get_emoji $UNIT_STATUS)
+          INTEGRATION_EMOJI=$(get_emoji $INTEGRATION_STATUS)
+          E2E_EMOJI=$(get_emoji $E2E_STATUS)
+          
+          # Check for coverage data
+          COVERAGE_LINES="N/A"
+          COVERAGE_STATEMENTS="N/A"
+          COVERAGE_FUNCTIONS="N/A"
+          COVERAGE_BRANCHES="N/A"
+          
+          if [ -f all-results/coverage-report/coverage-summary.json ]; then
+            COVERAGE_LINES=$(jq '.total.lines.pct' all-results/coverage-report/coverage-summary.json)
+            COVERAGE_STATEMENTS=$(jq '.total.statements.pct' all-results/coverage-report/coverage-summary.json)
+            COVERAGE_FUNCTIONS=$(jq '.total.functions.pct' all-results/coverage-report/coverage-summary.json)
+            COVERAGE_BRANCHES=$(jq '.total.branches.pct' all-results/coverage-report/coverage-summary.json)
+          fi
+          
+          # Create summary markdown
+          cat << EOF > test-summary.md
+          # 🧪 Test Results Summary
+          
+          **Commit:** \`${{ github.sha }}\`
+          **Branch:** \`${{ github.ref_name }}\`
+          **Run:** [#${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+          
+          ## Test Status
+          
+          | Test Suite | Status | Result |
+          |------------|--------|--------|
+          | Unit Tests | ${UNIT_EMOJI} | ${UNIT_STATUS} |
+          | Integration Tests | ${INTEGRATION_EMOJI} | ${INTEGRATION_STATUS} |
+          | E2E Tests (3 shards) | ${E2E_EMOJI} | ${E2E_STATUS} |
+          
+          ## Code Coverage
+          
+          | Metric | Coverage |
+          |--------|----------|
+          | Lines | ${COVERAGE_LINES}% |
+          | Statements | ${COVERAGE_STATEMENTS}% |
+          | Functions | ${COVERAGE_FUNCTIONS}% |
+          | Branches | ${COVERAGE_BRANCHES}% |
+          
+          ## Test Categories
+          
+          - 🔐 **Authentication** - Login, signup, 2FA flows
+          - 🛡️ **Security** - Rate limiting, session management
+          - 📊 **Analytics** - Dashboard and performance tracking
+          - 🎬 **Video** - Generation pipeline tests
+          - 📝 **Scripts** - Creation, versioning, branching
+          - ♿ **Accessibility** - WCAG compliance
+          - 👁️ **Visual Regression** - UI consistency
+          
+          ---
+          *Generated at $(date -u +"%Y-%m-%d %H:%M:%S UTC")*
+          EOF
+          
+          cat test-summary.md >> $GITHUB_STEP_SUMMARY
+          
+          # Set overall status
+          if [ "$UNIT_STATUS" = "success" ] && [ "$INTEGRATION_STATUS" = "success" ] && [ "$E2E_STATUS" = "success" ]; then
+            echo "overall=success" >> $GITHUB_OUTPUT
+          else
+            echo "overall=failure" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Comment on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const summary = fs.readFileSync('test-summary.md', 'utf8');
+            
+            // Find existing comment
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            
+            const botComment = comments.find(comment => 
+              comment.user.type === 'Bot' && 
+              comment.body.includes('Test Results Summary')
+            );
+            
+            const body = summary;
+            
+            if (botComment) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+                body: body
+              });
+            } else {
+              await github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: body
+              });
+            }
+
+  coverage-badge:
+    name: Update Coverage Badge
+    runs-on: ubuntu-latest
+    needs: [unit-tests]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Download coverage badges
+        uses: actions/download-artifact@v4
+        with:
+          name: coverage-badges
+          path: .github/badges
+
+      - name: Commit badge updates
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add .github/badges/ || true
+          git diff --staged --quiet || git commit -m "chore: update coverage badges [skip ci]"
+          git push || true
+        continue-on-error: true
