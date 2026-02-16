@@ -3,8 +3,7 @@ import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { maskUserInfo, maskSensitiveData, truncateUserId } from "../_shared/piiMasking.ts";
 import { PROMPTS } from "../_shared/prompts/v1.ts";
-
-const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
+import { chat, AI_MODELS } from "../_shared/aiClient.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -158,32 +157,23 @@ serve(async (req) => {
       prompt = PROMPTS.generateScript.user.standard(topic || '', niche, tone, length);
     }
 
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${openAIApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        messages: [
-          { 
-            role: 'system', 
-            content: systemMessage
-          },
-          { role: 'user', content: prompt }
-        ],
-        max_tokens: 2000,
+    // Call AI Client (Gemini 2.5 Flash via Lovable Gateway)
+    // The separation of system and user messages helps with caching mechanisms in the underlying model
+    const { response: generatedContent, error: aiError } = await chat(
+      [
+        { role: 'system', content: systemMessage },
+        { role: 'user', content: prompt }
+      ],
+      {
+        model: AI_MODELS.chat.default, // Using Gemini 2.5 Flash which supports caching and long context
         temperature: 0.8,
-      }),
-    });
+        maxTokens: 2000
+      }
+    );
 
-    if (!response.ok) {
-      throw new Error(`OpenAI API error: ${response.statusText}`);
+    if (aiError || !generatedContent) {
+      throw new Error(aiError || 'Failed to generate script content');
     }
-
-    const data = await response.json();
-    const generatedContent = data.choices[0].message.content;
     
     // Extract title and content from the generated script
     const lines = generatedContent.split('\n');
@@ -262,7 +252,7 @@ serve(async (req) => {
     
     // Secure error handling - don't expose internal details
     let publicError = "An unexpected error occurred. Please try again.";
-    if (errorMessage.includes("OpenAI API")) {
+    if (errorMessage.includes("AI Gateway") || errorMessage.includes("model")) {
       publicError = "AI service temporarily unavailable. Please try again later.";
     } else if (errorMessage.includes("rate limit")) {
       publicError = "Too many requests. Please wait before trying again.";
