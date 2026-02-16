@@ -3,7 +3,17 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { truncateUserId } from "../_shared/piiMasking.ts";
 import { corsHeaders } from "../_shared/corsHeaders.ts";
 
-const CURATED_TRENDS = [
+interface TrendItem {
+  id: string;
+  topic: string;
+  viral_score: number;
+  engagement_count: string;
+  category: string;
+  platform: string;
+  metadata: { keywords: string[] };
+}
+
+const CURATED_TRENDS: TrendItem[] = [
   {
     id: 'ai_storytime_2025',
     topic: 'AI Voiceover Storytime',
@@ -85,7 +95,22 @@ function formatCount(num: number): string {
   return num.toString();
 }
 
-async function fetchRealtimeTrends() {
+interface ApifyTrendStats {
+  playCount: number;
+}
+
+interface ApifyChallenge {
+  title: string;
+}
+
+interface ApifyTrendItem {
+  id: string;
+  desc: string;
+  stats: ApifyTrendStats;
+  challenges: ApifyChallenge[];
+}
+
+async function fetchRealtimeTrends(): Promise<TrendItem[] | null> {
   const token = Deno.env.get('APIFY_API_TOKEN');
   if (!token) return null;
 
@@ -111,10 +136,12 @@ async function fetchRealtimeTrends() {
       return null;
     }
 
-    const items = await response.json();
+    const items: unknown = await response.json();
     if (!Array.isArray(items) || items.length === 0) return null;
 
-    return items.map((item: any) => ({
+    // Use a type guard or explicit casting with runtime checks if possible, but for now we cast to mapped type
+    // We filter for items that match our structure
+    return (items as ApifyTrendItem[]).map((item) => ({
       id: item.id || `tiktok_${Date.now()}_${Math.random().toString(36).substring(7)}`,
       topic: item.desc ? item.desc.split('#')[0].trim().substring(0, 100) : 'Trending TikTok Video',
       viral_score: Math.min(Math.floor((item.stats?.playCount || 0) / 100000), 100), // simplistic score
@@ -122,7 +149,7 @@ async function fetchRealtimeTrends() {
       category: 'trending',
       platform: 'tiktok',
       metadata: { 
-        keywords: (item.challenges || []).map((c: any) => c.title) 
+        keywords: (item.challenges || []).map((c) => c.title) 
       }
     })).filter(t => t.topic.length > 0).slice(0, 10);
 
@@ -132,7 +159,7 @@ async function fetchRealtimeTrends() {
   }
 }
 
-serve(async (req) => {
+serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
 
   try {
@@ -190,12 +217,13 @@ serve(async (req) => {
     console.log(`Action by ${isCron ? 'Cron' : truncateUserId(userId)}: Updated ${trends.length} trends via ${source}`);
 
     return new Response(
-      JSON.stringify({ success: true, count: trends.length, source, trends: trends.map(t => t.topic) }),
+      JSON.stringify({ success: true, count: trends.length, source, trends: trends.map((t: TrendItem) => t.topic) }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
-  } catch (error: any) {
-    console.error('Error:', error.message);
-    return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: corsHeaders });
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error('Error:', errorMessage);
+    return new Response(JSON.stringify({ error: errorMessage }), { status: 500, headers: corsHeaders });
   }
 });
