@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { truncateUserId, maskSensitiveData } from "../_shared/piiMasking.ts";
+import { PROMPTS } from "../_shared/prompts/v1.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -126,21 +127,7 @@ serve(async (req) => {
       throw new Error('OpenAI API key not configured');
     }
 
-    const biblePrompt = `Create a series bible for a ${episodeCount}-episode vertical video mini-drama series.
-
-PREMISE: ${sanitizedPremise}
-NICHE: ${sanitizedNiche}
-TONE: ${sanitizedTone}
-
-Generate a comprehensive series bible including:
-1. Main characters (2-3 characters with names, roles, motivations)
-2. Overall story arc (beginning, middle, end)
-3. Key conflicts and themes
-4. Setting and world details
-5. Episode breakdown (brief summary for each episode)
-
-Each episode should be 60-90 seconds long, designed for 9:16 vertical video format.
-End each episode with a compelling cliffhanger to drive binge-watching.`;
+    const biblePrompt = PROMPTS.generateSeries.bible.user(episodeCount, sanitizedPremise, sanitizedNiche, sanitizedTone);
 
     const bibleResponse = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -153,7 +140,7 @@ End each episode with a compelling cliffhanger to drive binge-watching.`;
         messages: [
           {
             role: 'system',
-            content: 'You are an expert screenwriter for viral short-form vertical video content. You specialize in creating binge-worthy mini-drama series.'
+            content: PROMPTS.generateSeries.bible.system
           },
           {
             role: 'user',
@@ -172,38 +159,7 @@ End each episode with a compelling cliffhanger to drive binge-watching.`;
     // Generate individual episodes
     const episodes = [];
     for (let i = 1; i <= episodeCount; i++) {
-      const isFirstEpisode = i === 1;
-      const isLastEpisode = i === episodeCount;
-
-      const episodePrompt = `Generate Episode ${i} of ${episodeCount} for the mini-drama series.
-
-SERIES BIBLE:
-${bible}
-
-EPISODE ${i} REQUIREMENTS:
-${isFirstEpisode ? '- Introduce main characters and establish the world\n- Set up the central conflict\n' : ''}
-${isLastEpisode ? '- Resolve the main storyline\n- Provide satisfying conclusion\n' : '- Continue the narrative momentum\n- End with a cliffhanger\n'}
-- Duration: 60-90 seconds
-- Format: Vertical video (9:16)
-- Include timestamps for each scene
-
-OUTPUT FORMAT:
-Title: [Episode title]
-Duration: [60-90s]
-
-[0-15s] OPENING
-[Scene description and dialogue]
-
-[16-35s] ESCALATION
-[Scene description and dialogue]
-
-[36-60s] CLIMAX
-[Scene description and dialogue]
-
-${isLastEpisode ? '' : '[61-75s] CLIFFHANGER\n[Scene description and dialogue]\n\n[Preview for Episode ' + (i + 1) + ']'}
-
-Tone: ${sanitizedTone}
-Niche: ${sanitizedNiche}`;
+      const episodePrompt = PROMPTS.generateSeries.episode.user(i, episodeCount, bible, sanitizedTone, sanitizedNiche);
 
       const episodeResponse = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
@@ -216,7 +172,7 @@ Niche: ${sanitizedNiche}`;
           messages: [
             {
               role: 'system',
-              content: 'You are an expert screenwriter for viral short-form vertical video content.'
+              content: PROMPTS.generateSeries.episode.system
             },
             {
               role: 'user',

@@ -2,6 +2,7 @@ import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { maskUserInfo, maskSensitiveData, truncateUserId } from "../_shared/piiMasking.ts";
+import { PROMPTS } from "../_shared/prompts/v1.ts";
 
 const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
 
@@ -142,75 +143,19 @@ serve(async (req) => {
 
     // Mode-specific prompts
     let prompt = '';
-    let systemMessage = 'You are a professional screenwriter who specializes in creating engaging mini-drama scripts for social media and short video content.';
+    let systemMessage = PROMPTS.generateScript.system.standard;
     
     if (scriptMode === 'ai_storytime') {
-      systemMessage = 'You are an expert in creating viral AI voiceover storytime scripts. You specialize in chaotic, dramatic, embarrassing stories optimized for TTS delivery.';
-      prompt = `Generate a TTS-optimized AI voiceover storytime script for "${topic || niche}" in ${niche} niche.
-
-CRITICAL REQUIREMENTS:
-1. Write for AI voiceover pacing - use natural pauses, shorter sentences
-2. Include [PAUSE] markers every 3-5 seconds for B-roll cuts
-3. Use "chaotic, dramatic, embarrassing" storytelling style
-4. Start with a STRONG hook: "So this actually happened to me..."
-5. Include emotional peaks: shock, realization, punchline
-6. End with a viral callback or question
-
-FORMAT:
-[0-3s] HOOK: [opening line]
-[PAUSE - show reaction shot]
-[4-8s] SETUP: [scene setting]
-[PAUSE - show B-roll]
-[9-15s] ESCALATION: [conflict builds]
-[PAUSE - dramatic moment]
-[16-22s] CLIMAX: [peak moment]
-[PAUSE - reaction]
-[23-30s] PUNCHLINE: [twist or callback]
-
-Tone: ${tone}
-Length: ${length}
-Optimize for: Podcastle/ElevenLabs TTS
-
-IMPORTANT: This is FICTION ONLY. Do not use real people's names, specific locations, or anything that could be mistaken for real testimony. Add disclaimer at end: "This is a work of fiction."`;
+      systemMessage = PROMPTS.generateScript.system.storytime;
+      prompt = PROMPTS.generateScript.user.storytime(topic || niche, niche, tone, length);
 
     } else if (scriptMode === 'pov_skit') {
-      systemMessage = 'You are an expert in creating viral POV (Point of View) mini-drama scripts with multiple hook variations for A/B testing.';
-      prompt = `Generate a POV (Point of View) mini-drama script for "${topic || niche}" in ${niche} niche.
-
-STRUCTURE:
-- Opening: "POV: You're [role] and [inciting incident] happens"
-- 3-5 scenes showing escalation
-- Each scene = 5-8 seconds
-- Include stage directions for acting
-- Dialogue should be punchy and quotable
-
-FIRST, generate 5 HOOK VARIATIONS (clearly labeled):
-HOOK 1: [variation]
-HOOK 2: [variation]
-HOOK 3: [variation]
-HOOK 4: [variation]
-HOOK 5: [variation]
-
-THEN, provide the CORE SPINE (main script with timestamps).
-
-Topic: ${topic || niche}
-Niche: ${niche}
-Tone: ${tone}
-Length: ${length}`;
+      systemMessage = PROMPTS.generateScript.system.pov;
+      prompt = PROMPTS.generateScript.user.pov(topic || niche, niche, tone, length);
 
     } else {
       // Standard mode
-      prompt = `Generate a ${length} mini-drama script in the ${niche} niche with a ${tone} tone${topic ? ` about ${topic}` : ''}. 
-
-Requirements:
-- Create an engaging title
-- Write compelling dialogue and scene descriptions
-- Include character development and emotional moments
-- Format it as a proper script with scene headers, character names, and dialogue
-- Make it suitable for social media or short video content
-- Length should be appropriate for ${length} format
-
-Please provide both a title and the full script content.`;
+      prompt = PROMPTS.generateScript.user.standard(topic || '', niche, tone, length);
     }
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {

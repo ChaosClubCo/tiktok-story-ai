@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { truncateUserId } from "../_shared/piiMasking.ts";
+import { PROMPTS } from "../_shared/prompts/v1.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -60,29 +61,8 @@ serve(async (req) => {
     }
 
     // Construct analysis prompt
-    const systemPrompt = `You are an expert social media content analyst specializing in viral TikTok and Instagram content. 
-Your job is to analyze mini-drama scripts and provide detailed viral potential scores.
-
-Analyze the following aspects:
-1. Hook Strength (0-100): How compelling is the opening? Does it grab attention in 3 seconds?
-2. Emotional Impact (0-100): Does it trigger strong emotions (anger, shock, empathy, humor)?
-3. Conflict Clarity (0-100): Is there clear tension/stakes that keep viewers watching?
-4. Pacing Quality (0-100): Does the story flow well? Are there unnecessary parts?
-5. Dialogue Quality (0-100): Is the dialogue natural, quotable, and memorable?
-6. Quotability (0-100): Are there lines people will repeat or comment?
-7. Relatability (0-100): Will the target audience see themselves in this story?
-
-Provide scores and specific, actionable recommendations.`;
-
-    const userPrompt = `Analyze this mini-drama script:
-
-TITLE: ${title || 'Untitled'}
-NICHE: ${niche || 'Unknown'}
-
-SCRIPT CONTENT:
-${content}
-
-Provide a detailed analysis with scores and recommendations.`;
+    const systemPrompt = PROMPTS.analyzeScript.system;
+    const userPrompt = PROMPTS.analyzeScript.user(title, niche, content);
 
     const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
