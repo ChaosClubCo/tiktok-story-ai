@@ -1,13 +1,8 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { truncateUserId } from "../_shared/piiMasking.ts";
+import { corsHeaders } from "../_shared/corsHeaders.ts";
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
-
-// Manual trending topics (can be updated via admin dashboard or cron job)
 const CURATED_TRENDS = [
   {
     id: 'ai_storytime_2025',
@@ -83,55 +78,106 @@ const CURATED_TRENDS = [
   }
 ];
 
-serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+// Helper to normalized counts (e.g. 1200000 -> 1.2M)
+function formatCount(num: number): string {
+  if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M+';
+  if (num >= 1000) return (num / 1000).toFixed(1) + 'K+';
+  return num.toString();
+}
+
+async function fetchRealtimeTrends() {
+  const token = Deno.env.get('APIFY_API_TOKEN');
+  if (!token) return null;
+
+  try {
+    // Using simple TikTok Scraper actor (e.g. novi/tiktok-trend-api or clockworks/free-tiktok-scraper)
+    // For this example, we'll hit the Apify run-sync endpoint for a specific actor.
+    // Actor ID for "TikTok Trends": 'OtzYfK1ndEGdwWpKq' (novi/tiktok-trend-api) is a good candidate.
+    const actorId = 'OtzYfK1ndEGdwWpKq'; 
+    const url = `https://api.apify.com/v2/acts/${actorId}/run-sync-get-dataset-items?token=${token}`;
+    
+    // Input for the actor (fetching trending feed)
+    const input = { count: 10, type: 'trend' }; // generic input structure
+
+    console.log('Fetching live trends from Apify...');
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(input)
+    });
+
+    if (!response.ok) {
+      console.warn(`Apify API failed: ${response.status} ${response.statusText}`);
+      return null;
+    }
+
+    const items = await response.json();
+    if (!Array.isArray(items) || items.length === 0) return null;
+
+    return items.map((item: any) => ({
+      id: item.id || `tiktok_${Date.now()}_${Math.random().toString(36).substring(7)}`,
+      topic: item.desc ? item.desc.split('#')[0].trim().substring(0, 100) : 'Trending TikTok Video',
+      viral_score: Math.min(Math.floor((item.stats?.playCount || 0) / 100000), 100), // simplistic score
+      engagement_count: formatCount(item.stats?.playCount || 0) + ' views',
+      category: 'trending',
+      platform: 'tiktok',
+      metadata: { 
+        keywords: (item.challenges || []).map((c: any) => c.title) 
+      }
+    })).filter(t => t.topic.length > 0).slice(0, 10);
+
+  } catch (err) {
+    console.error('Failed to fetch realtime trends:', err);
+    return null;
   }
+}
+
+serve(async (req) => {
+  if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
 
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Verify authentication and admin role
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader) {
-      console.error('Missing authorization header');
-      return new Response(
-        JSON.stringify({ error: 'Unauthorized - Missing authentication' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+    // Auth Logic: Check if Cron or Admin
+    const url = new URL(req.url);
+    const isCron = url.searchParams.get('source') === 'cron';
+    let userId = 'system';
+
+    if (isCron) {
+      const authHeader = req.headers.get('Authorization');
+      const cronSecret = Deno.env.get('CRON_SECRET');
+      if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
+        return new Response(JSON.stringify({ error: 'Unauthorized Cron' }), { status: 401, headers: corsHeaders });
+      }
+      console.log('Running via Cron...');
+    } else {
+      const authHeader = req.headers.get('Authorization');
+      if (!authHeader) throw new Error('Missing auth header');
+      const token = authHeader.replace('Bearer ', '');
+      const { data: { user }, error } = await supabase.auth.getUser(token);
+      if (error || !user) throw new Error('Invalid token');
+      
+      const { data: isAdmin } = await supabase.rpc('is_admin', { _user_id: user.id });
+      if (!isAdmin) return new Response(JSON.stringify({ error: 'Forbidden' }), { status: 403, headers: corsHeaders });
+      userId = user.id;
     }
 
-    const token = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-    
-    if (authError || !user) {
-      console.error('Authentication failed:', authError?.message);
-      return new Response(
-        JSON.stringify({ error: 'Unauthorized - Invalid token' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+    let trends = await fetchRealtimeTrends();
+    let source = 'apify';
+
+    if (!trends) {
+      console.log('Falling back to curated trends');
+      trends = CURATED_TRENDS;
+      source = 'curated_fallback';
     }
 
-    // Check if user is admin
-    const { data: isAdmin, error: roleError } = await supabase.rpc('is_admin', { _user_id: user.id });
-    
-    if (roleError || !isAdmin) {
-      console.error('Admin check failed:', roleError?.message);
-      return new Response(
-        JSON.stringify({ error: 'Forbidden - Admin access required' }),
-        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    console.log(`Admin ${truncateUserId(user.id)} updating trending topics...`);
-
-    // Upsert curated trends
-    const { data, error } = await supabase
+    // Upsert logic
+    const { error: upsertError } = await supabase
       .from('trending_topics')
       .upsert(
-        CURATED_TRENDS.map(trend => ({
+        trends.map(trend => ({
           ...trend,
           last_updated: new Date().toISOString(),
           is_active: true
@@ -139,24 +185,17 @@ serve(async (req) => {
         { onConflict: 'id' }
       );
 
-    if (error) throw error;
+    if (upsertError) throw upsertError;
 
-    console.log(`Successfully updated ${CURATED_TRENDS.length} trending topics`);
+    console.log(`Action by ${isCron ? 'Cron' : truncateUserId(userId)}: Updated ${trends.length} trends via ${source}`);
 
     return new Response(
-      JSON.stringify({ 
-        success: true, 
-        count: CURATED_TRENDS.length,
-        trends: CURATED_TRENDS.map(t => t.topic)
-      }),
+      JSON.stringify({ success: true, count: trends.length, source, trends: trends.map(t => t.topic) }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
-  } catch (error) {
-    console.error('Error updating trends:', error.message);
-    return new Response(
-      JSON.stringify({ error: error.message }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+  } catch (error: any) {
+    console.error('Error:', error.message);
+    return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: corsHeaders });
   }
 });
